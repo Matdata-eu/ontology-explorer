@@ -1,0 +1,4 @@
+# getrandom (pulled in by oxrdf's blank node ids) needs to be told to use the
+# JavaScript crypto API when compiled for the browser.
+[target.wasm32-unknown-unknown]
+rustflags = ['--cfg', 'getrandom_backend="wasm_js"']
