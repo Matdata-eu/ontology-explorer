@@ -1,0 +1,25 @@
+[package]
+name = "ontology-explorer-core"
+description = "Reads OWL/RDFS ontologies, SKOS concept schemes and SHACL shapes into one indexed model for the ontology-explorer viewer"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+keywords = ["rdf", "owl", "skos", "shacl", "ontology"]
+categories = ["parser-implementations", "visualization"]
+
+[dependencies]
+anyhow.workspace = true
+oxrdf.workspace = true
+oxttl.workspace = true
+oxrdfxml.workspace = true
+oxjsonld.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+flate2 = { version = "1", optional = true }
+
+[features]
+default = ["gzip"]
+gzip = ["dep:flate2"]
