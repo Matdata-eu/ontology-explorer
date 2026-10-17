@@ -1,0 +1,53 @@
+publiccodeYmlVersion: '0'
+name: ontology-explorer
+url: https://github.com/Matdata-eu/ontology-explorer
+landingURL: https://matdata-eu.github.io/ontology-explorer/
+softwareVersion: 0.1.0
+releaseDate: '2026-10-17'
+platforms:
+- linux
+- windows
+- mac
+- web
+categories:
+- knowledge-management
+- data-visualization
+- data-collection
+developmentStatus: beta
+softwareType: standalone/other
+organisation:
+  uri: https://matdata.eu
+  name: Matdata
+intendedAudience:
+  scope:
+  - government
+  - science-and-technology
+  - infrastructures
+  - transportation
+description:
+  en:
+    shortDescription: Shows OWL ontologies, SKOS vocabularies and SHACL shapes as UML-like diagrams and readable
+      pages, in the browser.
+    longDescription: |
+      RDF ontologies and SHACL shapes are hard to understand for most people, and large ones even more so. ontology-explorer reads OWL/RDFS ontologies, SKOS concept schemes and SHACL shapes together and shows them as class diagrams, trees and one readable page per class, property, vocabulary and shape.
+
+      Each class page lists every property the class can have, with its cardinality, expected value, value set and constraints, merged from the ontology, OWL restrictions and SHACL shapes. DASH annotations (property groups, roles, abstract classes, composition) organise the pages and diagrams, and the viewer falls back to sensible defaults without them. It runs entirely in the browser, can be published on GitHub Pages, embeds in other web applications as a web component, and comes with a command-line tool that pre-indexes large models such as the ERA vocabulary of the European Union Agency for Railways.
+    documentation: https://github.com/Matdata-eu/ontology-explorer#readme
+    features:
+    - UML-like class diagrams with export to SVG, PNG, PlantUML and Mermaid
+    - Class pages merging ontology, OWL restrictions and SHACL shapes
+    - SKOS vocabulary trees and value-set detection
+    - SHACL DASH support with fallbacks
+    - Runs in the browser; web component for embedding
+legal:
+  license: Apache-2.0
+  mainCopyrightOwner: Matdata
+maintenance:
+  type: internal
+  contacts:
+  - name: Mathias Vanden Auweele
+    affiliation: Matdata
+localisation:
+  localisationReady: false
+  availableLanguages:
+  - en
