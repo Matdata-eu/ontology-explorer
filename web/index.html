@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>ontology-explorer</title>
+    <meta name="description" content="Visual explorer for OWL/RDFS ontologies, SKOS concept schemes and SHACL shapes: UML-like diagrams, trees and readable pages, in your browser." />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232a62c9' stroke-width='2'%3E%3Crect x='3' y='4' width='8' height='6' rx='1'/%3E%3Crect x='13' y='14' width='8' height='6' rx='1'/%3E%3Cpath d='M7 10v4h10'/%3E%3C/svg%3E" />
+    <style>
+      html, body { margin: 0; height: 100%; background: #f7f7f8; }
+      @media (prefers-color-scheme: dark) { html, body { background: #121417; } }
+      ontology-explorer { display: block; height: 100%; }
+    </style>
+    <script type="module" src="/src/main.ts"></script>
+  </head>
+  <body>
+    <ontology-explorer routing></ontology-explorer>
+    <noscript>ontology-explorer needs JavaScript.</noscript>
+  </body>
+</html>

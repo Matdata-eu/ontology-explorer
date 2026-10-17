@@ -1,0 +1,34 @@
+{
+  "name": "@matdata/ontology-explorer",
+  "version": "0.1.0",
+  "description": "Visual explorer for OWL/RDFS ontologies, SKOS concept schemes and SHACL shapes: UML-like diagrams, trees and readable pages. Web app and <ontology-explorer> web component.",
+  "license": "Apache-2.0",
+  "author": "Mathias Vanden Auweele <mathias@matdata.eu>",
+  "homepage": "https://github.com/Matdata-eu/ontology-explorer",
+  "repository": { "type": "git", "url": "git+https://github.com/Matdata-eu/ontology-explorer.git" },
+  "bugs": { "url": "https://github.com/Matdata-eu/ontology-explorer/issues" },
+  "keywords": ["rdf", "owl", "skos", "shacl", "ontology", "uml", "web-component", "dash"],
+  "type": "module",
+  "files": ["dist-lib", "README.md", "LICENSE", "THIRD_PARTY_NOTICES.md"],
+  "main": "./dist-lib/ontology-explorer.js",
+  "module": "./dist-lib/ontology-explorer.js",
+  "types": "./dist-lib/lib.d.ts",
+  "exports": {
+    ".": { "types": "./dist-lib/lib.d.ts", "import": "./dist-lib/ontology-explorer.js" }
+  },
+  "scripts": {
+    "wasm": "node scripts/build-wasm.mjs",
+    "dev": "vite",
+    "build": "npm run wasm && tsc --noEmit && vite build",
+    "build:lib": "npm run wasm && vite build --config vite.lib.config.ts && tsc -p tsconfig.lib.json",
+    "check": "tsc --noEmit",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "elkjs": "^0.12.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "vite": "^6.0.0"
+  }
+}

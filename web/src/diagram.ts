@@ -1,0 +1,547 @@
+// Draws a GraphSpec as a UML-style SVG: ELK for layout, hand-made rendering,
+// pan and zoom, highlighting, SVG and PNG export.
+import { clear, downloadBlob, s } from "./dom";
+import type { AttrLine, EdgeSpec, GraphSpec, NodeSpec } from "./graph";
+import { layout, type ElkNode } from "./layout";
+
+const FONT = '12px system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+const NAME_FONT = '650 13px system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+const LINE = 17;
+const PAD_X = 12;
+const HEAD_H = 30;
+const STEREO_H = 14;
+const MIN_W = 120;
+const MAX_W = 320;
+
+let ctx: CanvasRenderingContext2D | null = null;
+function measure(text: string, font = FONT): number {
+  if (!ctx) {
+    const c = document.createElement("canvas");
+    ctx = c.getContext("2d");
+  }
+  if (!ctx) return text.length * 7;
+  ctx.font = font;
+  return ctx.measureText(text).width;
+}
+
+const EDGE_FONT = "11px system-ui";
+/** Long property names would stretch the layout; the full name shows on hover. */
+function edgeLabel(text: string): string {
+  return ellipsize(text, 170, EDGE_FONT);
+}
+
+function ellipsize(text: string, max: number, font = FONT): string {
+  if (measure(text, font) <= max) return text;
+  let lo = 0;
+  let hi = text.length;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (measure(text.slice(0, mid) + "…", font) <= max) lo = mid;
+    else hi = mid - 1;
+  }
+  return text.slice(0, Math.max(1, lo)) + "…";
+}
+
+interface Sized {
+  w: number;
+  h: number;
+  /** Rows of (group header | attribute) in display order. */
+  rows: ({ header: string } | AttrLine)[];
+}
+
+function attrText(a: AttrLine): string {
+  return `${a.text}${a.type ? " : " + a.type : ""}${a.mult ? " " + a.mult : ""}`;
+}
+
+function size(n: NodeSpec): Sized {
+  const rows: ({ header: string } | AttrLine)[] = [];
+  let group: string | undefined;
+  for (const a of n.attrs) {
+    if (a.group && a.group !== group) {
+      group = a.group;
+      rows.push({ header: group });
+    }
+    rows.push(a);
+  }
+  let w = Math.max(MIN_W, measure(n.name, NAME_FONT) + PAD_X * 2 + 8);
+  if (n.stereotype) w = Math.max(w, measure(n.stereotype, "10.5px system-ui") + PAD_X * 2);
+  for (const r of rows) w = Math.max(w, measure("header" in r ? r.header : attrText(r)) + PAD_X * 2 + 4);
+  if (n.hiddenAttrs) w = Math.max(w, measure(`+${n.hiddenAttrs} more…`) + PAD_X * 2);
+  w = Math.min(MAX_W, Math.ceil(w));
+  let h = HEAD_H + (n.stereotype ? STEREO_H : 0);
+  const body = rows.length + (n.hiddenAttrs ? 1 : 0);
+  if (body > 0) h += body * LINE + 8;
+  else if (n.kind === "class") h += 6;
+  return { w, h: Math.ceil(h), rows };
+}
+
+export interface DiagramCallbacks {
+  onNavigate?: (id: number) => void;
+  onExpand?: (id: number) => void;
+  onToggleAttrs?: (id: number) => void;
+  onMore?: (ids: number[], relation: string) => void;
+  onStatus?: (text: string) => void;
+}
+
+export interface RenderOptions {
+  direction: "DOWN" | "RIGHT";
+  /** Keep the current pan/zoom when re-rendering. */
+  keepView?: boolean;
+  /** Use ELK's stress layout (for maps) instead of layered. */
+  algorithm?: "layered" | "stress";
+}
+
+export class Diagram {
+  readonly svg: SVGSVGElement;
+  private viewport: SVGGElement;
+  private host: HTMLElement;
+  private cb: DiagramCallbacks;
+  private scale = 1;
+  private tx = 0;
+  private ty = 0;
+  private content = { w: 0, h: 0 };
+  private spec: GraphSpec | null = null;
+  private seq = 0;
+
+  constructor(host: HTMLElement, cb: DiagramCallbacks) {
+    this.host = host;
+    this.cb = cb;
+    this.svg = s("svg", { class: "canvas uml", role: "img" });
+    this.svg.appendChild(this.defs());
+    this.viewport = s("g", { class: "viewport" });
+    this.svg.appendChild(this.viewport);
+    host.appendChild(this.svg);
+    this.wireInteraction();
+  }
+
+  private defs(): SVGDefsElement {
+    const d = s("defs");
+    const marker = (id: string, path: SVGPathElement, w = 12, h = 12, refX = 11, refY = 6) => {
+      const m = s("marker", { id, markerWidth: w, markerHeight: h, refX, refY, orient: "auto-start-reverse", markerUnits: "userSpaceOnUse" });
+      m.appendChild(path);
+      d.appendChild(m);
+    };
+    marker("m-tri", s("path", { class: "tri", d: "M1 1L11 6L1 11z" }), 13, 13, 11, 6);
+    marker("m-arrow", s("path", { class: "arrow", d: "M2 2L10 6L2 10" }), 12, 12, 10, 6);
+    marker("m-arrow-scheme", s("path", { class: "arrow-scheme", d: "M2 2L10 6L2 10" }), 12, 12, 10, 6);
+    marker("m-diamond", s("path", { class: "diamond", d: "M1 6L7 1L13 6L7 11z" }), 14, 12, 1, 6);
+    return d;
+  }
+
+  get graph(): GraphSpec | null {
+    return this.spec;
+  }
+
+  async render(spec: GraphSpec, opts: RenderOptions): Promise<void> {
+    const my = ++this.seq;
+    this.spec = spec;
+    const sizes = new Map<string, Sized>();
+    for (const n of spec.nodes) sizes.set(n.key, size(n));
+    const algorithm = opts.algorithm ?? "layered";
+    const elkGraph: ElkNode = {
+      id: "root",
+      layoutOptions: {
+        "elk.algorithm": algorithm,
+        "elk.direction": opts.direction,
+        "elk.spacing.nodeNode": algorithm === "stress" ? "60" : "36",
+        "elk.layered.spacing.nodeNodeBetweenLayers": "70",
+        "elk.layered.spacing.edgeNodeBetweenLayers": "30",
+        "elk.spacing.edgeNode": "24",
+        "elk.spacing.edgeEdge": "16",
+        "elk.spacing.edgeLabel": "6",
+        "elk.edgeRouting": algorithm === "stress" ? "POLYLINE" : "ORTHOGONAL",
+        "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
+        "elk.layered.considerModelOrder.strategy": "NODES_AND_EDGES",
+        "elk.layered.crossingMinimization.semiInteractive": "true",
+        "elk.layered.mergeEdges": "false",
+        "elk.edgeLabels.inline": "false",
+        "elk.stress.desiredEdgeLength": "180",
+        "elk.padding": "[top=20,left=20,bottom=20,right=20]",
+      },
+      children: spec.nodes.map((n) => {
+        const sz = sizes.get(n.key)!;
+        return { id: n.key, width: sz.w, height: sz.h };
+      }),
+      edges: spec.edges.map((e) => ({
+        id: e.key,
+        // Generalisations are drawn from the super class (source) to the sub
+        // class so the hierarchy reads top-down; the triangle sits at the source.
+        sources: [e.from],
+        targets: [e.to],
+        labels: e.label ? [{ text: edgeLabel(e.label), width: Math.ceil(measure(edgeLabel(e.label), EDGE_FONT)) + 6, height: 14 }] : undefined,
+        layoutOptions: e.kind === "gen" ? { "elk.layered.priority.direction": "10" } : undefined,
+      })),
+    };
+    let laid: ElkNode;
+    try {
+      laid = await layout(elkGraph);
+    } catch (e) {
+      this.cb.onStatus?.(`layout failed: ${(e as Error).message}`);
+      return;
+    }
+    if (my !== this.seq) return;
+    this.draw(spec, laid, sizes);
+    if (!opts.keepView) this.fit();
+    else this.applyTransform();
+  }
+
+  private draw(spec: GraphSpec, laid: ElkNode, sizes: Map<string, Sized>): void {
+    clear(this.viewport);
+    const pos = new Map<string, { x: number; y: number }>();
+    let maxX = 0;
+    let maxY = 0;
+    for (const c of laid.children ?? []) {
+      pos.set(c.id, { x: c.x ?? 0, y: c.y ?? 0 });
+      maxX = Math.max(maxX, (c.x ?? 0) + (c.width ?? 0));
+      maxY = Math.max(maxY, (c.y ?? 0) + (c.height ?? 0));
+    }
+    const edgesG = s("g", { class: "edges" });
+    const nodesG = s("g", { class: "nodes" });
+    this.viewport.append(edgesG, nodesG);
+    const byKey = new Map(spec.edges.map((e) => [e.key, e]));
+    for (const le of laid.edges ?? []) {
+      const e = byKey.get(le.id);
+      if (!e) continue;
+      const g = this.drawEdge(e, le);
+      if (g) edgesG.appendChild(g);
+      for (const l of le.labels ?? []) {
+        maxX = Math.max(maxX, (l.x ?? 0) + (l.width ?? 0));
+        maxY = Math.max(maxY, (l.y ?? 0) + (l.height ?? 0));
+      }
+    }
+    for (const n of spec.nodes) {
+      const p = pos.get(n.key);
+      const sz = sizes.get(n.key);
+      if (!p || !sz) continue;
+      nodesG.appendChild(this.drawNode(n, p.x, p.y, sz));
+    }
+    this.content = { w: maxX + 20, h: maxY + 20 };
+    this.cb.onStatus?.(`${spec.nodes.length} boxes, ${spec.edges.length} arrows${spec.omitted ? `, ${spec.omitted} neighbours not shown` : ""}`);
+  }
+
+  private drawEdge(e: EdgeSpec, le: NonNullable<ElkNode["edges"]>[number]): SVGGElement | null {
+    const sec = le.sections?.[0];
+    if (!sec) return null;
+    const pts = [sec.startPoint, ...(sec.bendPoints ?? []), sec.endPoint];
+    const d = pts.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(" ");
+    const g = s("g", { class: `edge ${e.kind}`, "data-from": e.from, "data-to": e.to });
+    const path = s("path", { d });
+    switch (e.kind) {
+      case "gen":
+        path.setAttribute("marker-start", "url(#m-tri)");
+        break;
+      case "comp":
+        path.setAttribute("marker-start", "url(#m-diamond)");
+        path.setAttribute("marker-end", "url(#m-arrow)");
+        break;
+      case "scheme":
+        path.setAttribute("marker-end", "url(#m-arrow-scheme)");
+        break;
+      default:
+        path.setAttribute("marker-end", "url(#m-arrow)");
+    }
+    g.appendChild(path);
+    // A wider invisible path makes hovering easier.
+    g.appendChild(s("path", { d, style: { stroke: "transparent", strokeWidth: "10", fill: "none" } }));
+    if (e.label) {
+      const l = le.labels?.[0];
+      const x = l ? (l.x ?? 0) + (l.width ?? 0) / 2 : (pts[0].x + pts[pts.length - 1].x) / 2;
+      const y = l ? (l.y ?? 0) + (l.height ?? 0) / 2 : (pts[0].y + pts[pts.length - 1].y) / 2;
+      const t = s("text", { x, y, "text-anchor": "middle" }, edgeLabel(e.label));
+      if (t.textContent !== e.label) t.appendChild(s("title", null, e.label));
+      g.appendChild(t);
+    }
+    if (e.mult) {
+      // Multiplicity near the target end.
+      const end = pts[pts.length - 1];
+      const prev = pts[pts.length - 2] ?? end;
+      const dx = Math.sign(end.x - prev.x);
+      const dy = Math.sign(end.y - prev.y);
+      const x = end.x - dx * 14 + (dx === 0 ? 8 : 0);
+      const y = end.y - dy * 14 + (dy === 0 ? -8 : 0);
+      g.appendChild(s("text", { class: "mult", x, y, "text-anchor": dx === 0 ? "start" : dx > 0 ? "end" : "start" }, e.mult));
+    }
+    if (e.id !== undefined) {
+      g.style.cursor = "pointer";
+      g.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        this.cb.onNavigate?.(e.id as number);
+      });
+      g.appendChild(s("title", null, `${e.label ?? ""} ${e.mult ?? ""}`.trim()));
+    }
+    return g;
+  }
+
+  private drawNode(n: NodeSpec, x: number, y: number, sz: Sized): SVGGElement {
+    const cls = ["node", n.kind, n.focus ? "focus" : "", n.external ? "external" : ""].filter(Boolean).join(" ");
+    const g = s("g", { class: cls, transform: `translate(${x} ${y})`, "data-key": n.key });
+    g.appendChild(s("rect", { class: "box", width: sz.w, height: sz.h, rx: 4 }));
+    const headH = HEAD_H + (n.stereotype ? STEREO_H : 0);
+    g.appendChild(s("rect", { class: "head", width: sz.w, height: headH, rx: 4 }));
+    // Square off the bottom of the head when there is a body.
+    if (sz.rows.length || n.hiddenAttrs) g.appendChild(s("rect", { class: "head", y: headH - 6, width: sz.w, height: 6 }));
+    let ty = 0;
+    if (n.stereotype) {
+      g.appendChild(s("text", { class: "stereo", x: sz.w / 2, y: 11 }, ellipsize(n.stereotype, sz.w - 10, "10.5px system-ui")));
+      ty = STEREO_H;
+    }
+    const nameCls = ["name", n.abstract ? "abstract" : "", n.deprecated ? "deprecated" : ""].filter(Boolean).join(" ");
+    g.appendChild(s("text", { class: nameCls, x: sz.w / 2, y: ty + HEAD_H / 2 + 1 }, ellipsize(n.name, sz.w - PAD_X * 2, NAME_FONT)));
+    if (sz.rows.length || n.hiddenAttrs) {
+      g.appendChild(s("line", { class: "sep", x1: 0, y1: headH, x2: sz.w, y2: headH }));
+      let yy = headH + 4 + LINE / 2;
+      for (const r of sz.rows) {
+        if ("header" in r) {
+          g.appendChild(s("text", { class: "attr", x: sz.w / 2, y: yy, "text-anchor": "middle", style: { fontStyle: "italic", fill: "var(--oe-text-3)" } }, ellipsize(r.header, sz.w - PAD_X * 2)));
+        } else {
+          const t = s("text", { class: `attr${r.inherited ? " inh" : ""}${r.deprecated ? " deprecated" : ""}`, x: PAD_X, y: yy });
+          const full = attrText(r);
+          if (measure(full) > sz.w - PAD_X * 2) {
+            t.textContent = ellipsize(full, sz.w - PAD_X * 2);
+          } else {
+            t.appendChild(document.createTextNode(r.text));
+            if (r.type) t.appendChild(s("tspan", { class: "type" }, ` : ${r.type}`));
+            if (r.mult) t.appendChild(s("tspan", { class: "mult" }, ` ${r.mult}`));
+          }
+          if (r.id !== undefined) {
+            t.style.cursor = "pointer";
+            t.addEventListener("click", (ev) => {
+              ev.stopPropagation();
+              this.cb.onNavigate?.(r.id as number);
+            });
+          }
+          t.appendChild(s("title", null, full));
+          g.appendChild(t);
+        }
+        yy += LINE;
+      }
+      if (n.hiddenAttrs) {
+        const more = s("text", { class: "more", x: PAD_X, y: yy }, `+${n.hiddenAttrs} more…`);
+        more.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          if (n.id !== undefined) this.cb.onToggleAttrs?.(n.id);
+        });
+        g.appendChild(more);
+      }
+    }
+    g.appendChild(s("title", null, `${n.name}${n.stereotype ? " " + n.stereotype : ""}\nclick: open · double-click: expand neighbours`));
+    if (n.kind === "more" && n.moreOf) {
+      g.addEventListener("click", () => this.cb.onMore?.(n.moreOf!.ids, n.moreOf!.relation));
+    } else if (n.id !== undefined) {
+      let clickTimer: ReturnType<typeof setTimeout> | undefined;
+      g.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        if (clickTimer) clearTimeout(clickTimer);
+        clickTimer = setTimeout(() => this.cb.onNavigate?.(n.id as number), 220);
+      });
+      g.addEventListener("dblclick", (ev) => {
+        ev.stopPropagation();
+        if (clickTimer) clearTimeout(clickTimer);
+        this.cb.onExpand?.(n.id as number);
+      });
+    }
+    g.addEventListener("pointerenter", () => this.highlight(n.key));
+    g.addEventListener("pointerleave", () => this.highlight(null));
+    return g;
+  }
+
+  private highlight(key: string | null): void {
+    const edges = this.viewport.querySelectorAll<SVGGElement>(".edge");
+    const nodes = this.viewport.querySelectorAll<SVGGElement>(".node");
+    if (!key) {
+      edges.forEach((e) => e.classList.remove("dim"));
+      nodes.forEach((n) => n.classList.remove("dim"));
+      return;
+    }
+    const linked = new Set<string>([key]);
+    edges.forEach((e) => {
+      const hit = e.dataset.from === key || e.dataset.to === key;
+      e.classList.toggle("dim", !hit);
+      if (hit) {
+        linked.add(e.dataset.from!);
+        linked.add(e.dataset.to!);
+      }
+    });
+    nodes.forEach((n) => n.classList.toggle("dim", !linked.has(n.dataset.key!)));
+  }
+
+  // ---- pan & zoom ---------------------------------------------------------
+
+  private applyTransform(): void {
+    this.viewport.setAttribute("transform", `translate(${this.tx} ${this.ty}) scale(${this.scale})`);
+  }
+
+  fit(): void {
+    const box = this.svg.getBoundingClientRect();
+    if (!box.width || !this.content.w) return;
+    // Keep clear of the toolbar on top and the status line at the bottom.
+    const top = 48;
+    const bottom = 30;
+    const sx = (box.width - 24) / this.content.w;
+    const sy = (box.height - top - bottom) / this.content.h;
+    this.scale = Math.min(1.1, Math.max(0.15, Math.min(sx, sy)));
+    this.tx = (box.width - this.content.w * this.scale) / 2;
+    this.ty = top + Math.max(0, (box.height - top - bottom - this.content.h * this.scale) / 2);
+    this.applyTransform();
+  }
+
+  zoomBy(f: number): void {
+    const box = this.svg.getBoundingClientRect();
+    this.zoomAt(f, box.width / 2, box.height / 2);
+  }
+
+  private zoomAt(f: number, px: number, py: number): void {
+    const ns = Math.min(4, Math.max(0.1, this.scale * f));
+    const k = ns / this.scale;
+    this.tx = px - (px - this.tx) * k;
+    this.ty = py - (py - this.ty) * k;
+    this.scale = ns;
+    this.applyTransform();
+  }
+
+  private wireInteraction(): void {
+    let dragging: { x: number; y: number; tx: number; ty: number; moved: boolean } | null = null;
+    const pointers = new Map<number, { x: number; y: number }>();
+    let pinch: { d: number; scale: number } | null = null;
+    this.svg.addEventListener("pointerdown", (ev) => {
+      pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+      if (pointers.size === 2) {
+        const [a, b] = [...pointers.values()];
+        pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), scale: this.scale };
+        dragging = null;
+        return;
+      }
+      dragging = { x: ev.clientX, y: ev.clientY, tx: this.tx, ty: this.ty, moved: false };
+      this.svg.setPointerCapture(ev.pointerId);
+    });
+    this.svg.addEventListener("pointermove", (ev) => {
+      if (pointers.has(ev.pointerId)) pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+      if (pinch && pointers.size === 2) {
+        const [a, b] = [...pointers.values()];
+        const d = Math.hypot(a.x - b.x, a.y - b.y);
+        const box = this.svg.getBoundingClientRect();
+        const f = (pinch.scale * (d / pinch.d)) / this.scale;
+        this.zoomAt(f, (a.x + b.x) / 2 - box.left, (a.y + b.y) / 2 - box.top);
+        return;
+      }
+      if (!dragging) return;
+      const dx = ev.clientX - dragging.x;
+      const dy = ev.clientY - dragging.y;
+      if (Math.abs(dx) + Math.abs(dy) > 3) dragging.moved = true;
+      this.tx = dragging.tx + dx;
+      this.ty = dragging.ty + dy;
+      this.applyTransform();
+    });
+    const up = (ev: PointerEvent) => {
+      pointers.delete(ev.pointerId);
+      if (pointers.size < 2) pinch = null;
+      if (dragging?.moved) {
+        // Swallow the click that follows a drag.
+        const stop = (e: Event) => {
+          e.stopPropagation();
+          this.svg.removeEventListener("click", stop, true);
+        };
+        this.svg.addEventListener("click", stop, true);
+        setTimeout(() => this.svg.removeEventListener("click", stop, true), 0);
+      }
+      dragging = null;
+    };
+    this.svg.addEventListener("pointerup", up);
+    this.svg.addEventListener("pointercancel", up);
+    this.svg.addEventListener(
+      "wheel",
+      (ev) => {
+        ev.preventDefault();
+        const box = this.svg.getBoundingClientRect();
+        const f = Math.exp(-ev.deltaY * (ev.deltaMode === 1 ? 0.05 : 0.0015));
+        this.zoomAt(f, ev.clientX - box.left, ev.clientY - box.top);
+      },
+      { passive: false }
+    );
+  }
+
+  // ---- export ---------------------------------------------------------
+
+  /** A standalone SVG document with the theme's colours inlined. */
+  exportSvg(): string {
+    const clone = this.svg.cloneNode(true) as SVGSVGElement;
+    clone.removeAttribute("class");
+    clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+    const vp = clone.querySelector(".viewport");
+    vp?.removeAttribute("transform");
+    clone.setAttribute("viewBox", `0 0 ${Math.ceil(this.content.w)} ${Math.ceil(this.content.h)}`);
+    clone.setAttribute("width", String(Math.ceil(this.content.w)));
+    clone.setAttribute("height", String(Math.ceil(this.content.h)));
+    clone.querySelectorAll(".dim").forEach((e) => e.classList.remove("dim"));
+    const style = document.createElementNS("http://www.w3.org/2000/svg", "style");
+    style.textContent = this.inlineCss();
+    clone.insertBefore(style, clone.firstChild);
+    const bg = s("rect", { width: "100%", height: "100%", fill: this.cssVar("--oe-panel") });
+    clone.insertBefore(bg, style.nextSibling);
+    return '<?xml version="1.0" encoding="UTF-8"?>\n' + new XMLSerializer().serializeToString(clone);
+  }
+
+  private cssVar(name: string): string {
+    const v = getComputedStyle(this.host).getPropertyValue(name).trim();
+    return v || "#000";
+  }
+
+  private inlineCss(): string {
+    const v = (n: string) => this.cssVar(n);
+    return `
+.node rect.box{fill:${v("--oe-panel")};stroke:${v("--oe-border-strong")};stroke-width:1.2}
+.node.focus rect.box{stroke:${v("--oe-accent")};stroke-width:2}
+.node.external rect.box{stroke-dasharray:4 3}
+.node .head{fill:${v("--oe-class-bg")}}
+.node.scheme .head{fill:${v("--oe-scheme-bg")}}
+text{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;font-size:12px;fill:${v("--oe-text")};dominant-baseline:middle}
+text.name{font-weight:650;font-size:13px;text-anchor:middle}
+text.name.abstract{font-style:italic}
+text.stereo{font-size:10.5px;fill:${v("--oe-text-2")};text-anchor:middle}
+text.attr{font-size:11.5px}
+text.attr .type{fill:${v("--oe-text-2")}}
+text.attr .mult{fill:${v("--oe-text-3")}}
+text.attr.inh{fill:${v("--oe-text-2")}}
+text.more{fill:${v("--oe-accent")};font-size:11px}
+text.deprecated{text-decoration:line-through;fill:${v("--oe-text-3")}}
+line.sep{stroke:${v("--oe-border-strong")};stroke-width:1}
+.edge path{fill:none;stroke:${v("--oe-text-2")};stroke-width:1.3}
+.edge.gen path{stroke:${v("--oe-text")}}
+.edge.assoc path{stroke:${v("--oe-class")}}
+.edge.comp path{stroke:${v("--oe-shape")}}
+.edge.scheme path{stroke:${v("--oe-scheme")};stroke-dasharray:5 3}
+.edge.incoming path{stroke-dasharray:2 3}
+.edge text{font-size:11px;fill:${v("--oe-text-2")};paint-order:stroke;stroke:${v("--oe-panel")};stroke-width:3px;stroke-linejoin:round}
+.edge text.mult{fill:${v("--oe-text-3")}}
+marker path.tri{fill:${v("--oe-panel")};stroke:${v("--oe-text")};stroke-width:1.2}
+marker path.arrow{fill:none;stroke:${v("--oe-class")};stroke-width:1.3}
+marker path.arrow-scheme{fill:none;stroke:${v("--oe-scheme")};stroke-width:1.3}
+marker path.diamond{fill:${v("--oe-shape")};stroke:${v("--oe-shape")}}
+`;
+  }
+
+  downloadSvg(name: string): void {
+    downloadBlob(new Blob([this.exportSvg()], { type: "image/svg+xml" }), `${name}.svg`);
+  }
+
+  async downloadPng(name: string, scale = 2): Promise<void> {
+    const svg = this.exportSvg();
+    const img = new Image();
+    const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error("cannot render SVG"));
+      img.src = url;
+    });
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.ceil(this.content.w * scale);
+    canvas.height = Math.ceil(this.content.h * scale);
+    const c = canvas.getContext("2d");
+    if (!c) return;
+    c.fillStyle = this.cssVar("--oe-panel");
+    c.fillRect(0, 0, canvas.width, canvas.height);
+    c.drawImage(img, 0, 0, canvas.width, canvas.height);
+    URL.revokeObjectURL(url);
+    canvas.toBlob((blob) => blob && downloadBlob(blob, `${name}.png`), "image/png");
+  }
+}
