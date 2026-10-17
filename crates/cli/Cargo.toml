@@ -1,0 +1,32 @@
+[package]
+name = "ontology-explorer"
+description = "Visual explorer for OWL/RDFS ontologies, SKOS concept schemes and SHACL shapes: UML-like diagrams, trees and readable detail pages, in a browser"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+readme = "../../README.md"
+keywords = ["rdf", "owl", "skos", "shacl", "ontology"]
+categories = ["command-line-utilities", "visualization"]
+default-run = "ontology-explorer"
+# web-dist/ and THIRD_PARTY_NOTICES.md are copied in by the release workflow before publishing.
+include = ["src/**", "build.rs", "web-dist/**", "THIRD_PARTY_NOTICES.md"]
+
+[[bin]]
+name = "ontology-explorer"
+path = "src/main.rs"
+
+[dependencies]
+ontology-explorer-core.workspace = true
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "json", "query"] }
+clap = { version = "4", features = ["derive", "env"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal", "sync", "fs"] }
+include_dir = "0.7"
+webbrowser = "1"
+ureq = "3"
+flate2 = "1"
