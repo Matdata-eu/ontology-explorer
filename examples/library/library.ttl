@@ -1,0 +1,112 @@
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix lib:  <https://example.org/library#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+
+<https://example.org/library> a owl:Ontology ;
+    rdfs:label "Library"@en , "Bibliotheek"@nl ;
+    rdfs:comment "A small example ontology: books, authors, loans and genres. It shows how ontology-explorer combines OWL, SKOS, SHACL and DASH."@en ;
+    owl:versionInfo "1.0" ;
+    dcterms:license <https://www.apache.org/licenses/LICENSE-2.0> .
+
+lib:Agent a owl:Class ;
+    rdfs:label "Agent"@en , "Actor"@nl ;
+    rdfs:comment "Someone or something that can act: a person or an organisation."@en .
+
+lib:Person a owl:Class ;
+    rdfs:subClassOf lib:Agent ;
+    rdfs:label "Person"@en , "Persoon"@nl .
+
+lib:Organisation a owl:Class ;
+    rdfs:subClassOf lib:Agent ;
+    owl:disjointWith lib:Person ;
+    rdfs:label "Organisation"@en , "Organisatie"@nl .
+
+lib:Publisher a owl:Class ;
+    rdfs:subClassOf lib:Organisation ;
+    rdfs:label "Publisher"@en , "Uitgever"@nl .
+
+lib:Member a owl:Class ;
+    rdfs:subClassOf lib:Person ;
+    rdfs:label "Member"@en , "Lid"@nl ;
+    rdfs:comment "A person who may borrow items."@en .
+
+lib:Work a owl:Class ;
+    rdfs:label "Work"@en , "Werk"@nl ;
+    rdfs:comment "An intellectual creation, independent of its copies."@en .
+
+lib:Book a owl:Class ;
+    rdfs:subClassOf lib:Work ,
+        [ a owl:Restriction ; owl:onProperty lib:author ; owl:minCardinality 1 ] ;
+    rdfs:label "Book"@en , "Boek"@nl .
+
+lib:Periodical a owl:Class ;
+    rdfs:subClassOf lib:Work ;
+    rdfs:label "Periodical"@en , "Tijdschrift"@nl .
+
+lib:Copy a owl:Class ;
+    rdfs:label "Copy"@en , "Exemplaar"@nl ;
+    rdfs:comment "A physical item on a shelf that can be lent out."@en .
+
+lib:Loan a owl:Class ;
+    rdfs:label "Loan"@en , "Uitlening"@nl .
+
+lib:Chapter a owl:Class ;
+    rdfs:label "Chapter"@en , "Hoofdstuk"@nl .
+
+lib:OldCatalogueEntry a owl:Class ;
+    rdfs:label "Old catalogue entry"@en ;
+    owl:deprecated true .
+
+# Properties
+lib:title a owl:DatatypeProperty ;
+    rdfs:label "title"@en , "titel"@nl ;
+    rdfs:domain lib:Work ; rdfs:range rdf:langString .
+lib:isbn a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "ISBN"@en ;
+    rdfs:domain lib:Book ; rdfs:range xsd:string .
+lib:pages a owl:DatatypeProperty ;
+    rdfs:label "number of pages"@en , "aantal pagina's"@nl ;
+    rdfs:domain lib:Book ; rdfs:range xsd:positiveInteger .
+lib:name a owl:DatatypeProperty ;
+    rdfs:label "name"@en , "naam"@nl ;
+    rdfs:domain lib:Agent ; rdfs:range xsd:string .
+lib:birthDate a owl:DatatypeProperty ;
+    rdfs:label "birth date"@en , "geboortedatum"@nl ;
+    rdfs:domain lib:Person ; rdfs:range xsd:date .
+lib:author a owl:ObjectProperty ;
+    rdfs:label "author"@en , "auteur"@nl ;
+    rdfs:domain lib:Work ; rdfs:range lib:Person ;
+    owl:inverseOf lib:wrote .
+lib:wrote a owl:ObjectProperty ;
+    rdfs:label "wrote"@en .
+lib:publisher a owl:ObjectProperty ;
+    rdfs:label "publisher"@en , "uitgever"@nl ;
+    rdfs:domain lib:Work ; rdfs:range lib:Publisher .
+lib:genre a owl:ObjectProperty ;
+    rdfs:label "genre"@en ;
+    rdfs:domain lib:Work ; rdfs:range skos:Concept .
+lib:hasChapter a owl:ObjectProperty ;
+    rdfs:label "has chapter"@en , "heeft hoofdstuk"@nl ;
+    rdfs:domain lib:Book ; rdfs:range lib:Chapter .
+lib:copyOf a owl:ObjectProperty ;
+    rdfs:label "copy of"@en , "exemplaar van"@nl ;
+    rdfs:domain lib:Copy ; rdfs:range lib:Work .
+lib:condition a owl:ObjectProperty ;
+    rdfs:label "condition"@en , "staat"@nl ;
+    rdfs:domain lib:Copy ; rdfs:range skos:Concept .
+lib:item a owl:ObjectProperty ;
+    rdfs:label "item"@en ;
+    rdfs:domain lib:Loan ; rdfs:range lib:Copy .
+lib:borrower a owl:ObjectProperty ;
+    rdfs:label "borrower"@en , "ontlener"@nl ;
+    rdfs:domain lib:Loan ; rdfs:range lib:Member .
+lib:dueDate a owl:DatatypeProperty ;
+    rdfs:label "due date"@en , "terugbrengdatum"@nl ;
+    rdfs:domain lib:Loan ; rdfs:range xsd:date .
+lib:memberNumber a owl:DatatypeProperty ;
+    rdfs:label "member number"@en , "lidnummer"@nl ;
+    rdfs:domain lib:Member ; rdfs:range xsd:string .

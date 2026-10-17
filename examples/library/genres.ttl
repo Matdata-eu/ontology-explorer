@@ -1,0 +1,37 @@
+@prefix gen:  <https://example.org/library/genre/> .
+@prefix cond: <https://example.org/library/condition/> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+gen:Genres a skos:ConceptScheme ;
+    skos:prefLabel "Genres"@en , "Genres"@nl ;
+    skos:definition "Literary genres used to classify works."@en ;
+    skos:hasTopConcept gen:fiction , gen:nonFiction .
+
+gen:fiction a skos:Concept ; skos:inScheme gen:Genres ; skos:topConceptOf gen:Genres ;
+    skos:prefLabel "Fiction"@en , "Fictie"@nl ; skos:notation "F" ;
+    skos:narrower gen:novel , gen:poetry , gen:crime .
+gen:novel a skos:Concept ; skos:inScheme gen:Genres ; skos:broader gen:fiction ;
+    skos:prefLabel "Novel"@en , "Roman"@nl ; skos:notation "F1" .
+gen:poetry a skos:Concept ; skos:inScheme gen:Genres ; skos:broader gen:fiction ;
+    skos:prefLabel "Poetry"@en , "Poëzie"@nl ; skos:notation "F2" .
+gen:crime a skos:Concept ; skos:inScheme gen:Genres ; skos:broader gen:fiction ;
+    skos:prefLabel "Crime"@en , "Misdaad"@nl ; skos:altLabel "Detective"@en ; skos:notation "F3" ;
+    skos:related gen:trueCrime .
+gen:nonFiction a skos:Concept ; skos:inScheme gen:Genres ; skos:topConceptOf gen:Genres ;
+    skos:prefLabel "Non-fiction"@en , "Non-fictie"@nl ; skos:notation "N" ;
+    skos:narrower gen:history , gen:science , gen:trueCrime .
+gen:history a skos:Concept ; skos:inScheme gen:Genres ; skos:broader gen:nonFiction ;
+    skos:prefLabel "History"@en , "Geschiedenis"@nl ; skos:notation "N1" .
+gen:science a skos:Concept ; skos:inScheme gen:Genres ; skos:broader gen:nonFiction ;
+    skos:prefLabel "Science"@en , "Wetenschap"@nl ; skos:notation "N2" ;
+    skos:exactMatch <http://id.loc.gov/authorities/subjects/sh00007934> .
+gen:trueCrime a skos:Concept ; skos:inScheme gen:Genres ; skos:broader gen:nonFiction ;
+    skos:prefLabel "True crime"@en ; skos:notation "N3" .
+
+cond:Conditions a skos:ConceptScheme ;
+    skos:prefLabel "Copy conditions"@en , "Staat van exemplaren"@nl ;
+    skos:hasTopConcept cond:new , cond:good , cond:worn , cond:damaged .
+cond:new a skos:Concept ; skos:inScheme cond:Conditions ; skos:topConceptOf cond:Conditions ; skos:prefLabel "New"@en , "Nieuw"@nl .
+cond:good a skos:Concept ; skos:inScheme cond:Conditions ; skos:topConceptOf cond:Conditions ; skos:prefLabel "Good"@en , "Goed"@nl .
+cond:worn a skos:Concept ; skos:inScheme cond:Conditions ; skos:topConceptOf cond:Conditions ; skos:prefLabel "Worn"@en , "Versleten"@nl .
+cond:damaged a skos:Concept ; skos:inScheme cond:Conditions ; skos:topConceptOf cond:Conditions ; skos:prefLabel "Damaged"@en , "Beschadigd"@nl .
