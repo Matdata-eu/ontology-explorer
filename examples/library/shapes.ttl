@@ -1,0 +1,94 @@
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix lib:  <https://example.org/library#> .
+@prefix libsh: <https://example.org/library/shapes#> .
+@prefix gen:  <https://example.org/library/genre/> .
+@prefix cond: <https://example.org/library/condition/> .
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix dash: <http://datashapes.org/dash#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+# Property groups organise the tables and the diagram boxes.
+libsh:Identification a sh:PropertyGroup ; rdfs:label "Identification"@en ; sh:order 0 .
+libsh:Content a sh:PropertyGroup ; rdfs:label "Content"@en ; sh:order 1 .
+libsh:Publication a sh:PropertyGroup ; rdfs:label "Publication"@en ; sh:order 2 .
+
+libsh:AgentShape a sh:NodeShape ;
+    sh:targetClass lib:Agent ;
+    dash:abstract true ;
+    sh:property [
+        sh:path lib:name ; sh:name "name" ; sh:datatype xsd:string ;
+        sh:minCount 1 ; sh:maxCount 1 ; sh:minLength 1 ;
+        dash:propertyRole dash:LabelRole ;
+    ] .
+
+libsh:WorkShape a sh:NodeShape ;
+    sh:targetClass lib:Work ;
+    sh:property [
+        sh:path lib:title ; sh:datatype rdf:langString ; sh:minCount 1 ; sh:uniqueLang true ;
+        sh:group libsh:Identification ; sh:order 0 ;
+        dash:propertyRole dash:LabelRole ;
+    ] , [
+        sh:path lib:genre ; sh:class skos:Concept ; sh:node libsh:GenreConcept ;
+        sh:group libsh:Content ; sh:order 1 ;
+        sh:description "A genre from the Genres scheme."@en ;
+    ] , [
+        sh:path lib:publisher ; sh:class lib:Publisher ; sh:maxCount 1 ;
+        sh:group libsh:Publication ; sh:order 0 ;
+    ] .
+
+libsh:GenreConcept a sh:NodeShape ;
+    sh:property [ sh:path skos:inScheme ; sh:hasValue gen:Genres ] .
+
+libsh:BookShape a sh:NodeShape ;
+    sh:targetClass lib:Book ;
+    sh:property [
+        sh:path lib:isbn ; sh:name "ISBN" ; sh:datatype xsd:string ;
+        sh:pattern "^(97[89])?\\d{9}[\\dX]$" ; sh:maxCount 1 ;
+        sh:group libsh:Identification ; sh:order 1 ;
+        dash:propertyRole dash:IDRole ;
+    ] , [
+        sh:path lib:author ; sh:class lib:Person ; sh:minCount 1 ;
+        sh:group libsh:Content ; sh:order 0 ;
+    ] , [
+        sh:path lib:pages ; sh:datatype xsd:positiveInteger ; sh:maxCount 1 ;
+        sh:minInclusive 1 ; sh:maxInclusive 20000 ;
+        sh:group libsh:Content ; sh:order 2 ;
+    ] , [
+        sh:path lib:hasChapter ; sh:class lib:Chapter ;
+        dash:composite true ;
+        sh:group libsh:Content ; sh:order 3 ;
+    ] .
+
+libsh:CopyShape a sh:NodeShape ;
+    sh:targetClass lib:Copy ;
+    sh:property [
+        sh:path lib:copyOf ; sh:class lib:Work ; sh:minCount 1 ; sh:maxCount 1 ;
+    ] , [
+        sh:path lib:condition ; sh:maxCount 1 ;
+        sh:in ( cond:new cond:good cond:worn cond:damaged ) ;
+    ] .
+
+libsh:LoanShape a sh:NodeShape ;
+    sh:targetClass lib:Loan ;
+    sh:property [
+        sh:path lib:item ; sh:class lib:Copy ; sh:minCount 1 ; sh:maxCount 1 ;
+    ] , [
+        sh:path lib:borrower ; sh:class lib:Member ; sh:minCount 1 ; sh:maxCount 1 ;
+    ] , [
+        sh:path lib:dueDate ; sh:datatype xsd:date ; sh:minCount 1 ; sh:maxCount 1 ;
+    ] .
+
+libsh:MemberShape a sh:NodeShape ;
+    sh:targetClass lib:Member ;
+    sh:property [
+        sh:path lib:memberNumber ; sh:datatype xsd:string ; sh:minCount 1 ; sh:maxCount 1 ;
+        sh:pattern "^M[0-9]{6}$" ;
+        dash:propertyRole dash:IDRole ; dash:readOnly true ;
+    ] , [
+        sh:path lib:birthDate ; sh:datatype xsd:date ; sh:maxCount 1 ;
+        dash:hidden true ;
+    ] , [
+        sh:path [ sh:inversePath lib:borrower ] ; sh:name "loans" ; sh:class lib:Loan ;
+    ] .
