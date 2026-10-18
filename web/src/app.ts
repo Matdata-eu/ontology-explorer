@@ -1,8 +1,9 @@
 // The application: state, routing, the shell around the views.
 import type { AppCtx, Prefs, Route } from "./ctx";
-import { button, h, icon, type Child } from "./dom";
+import { button, h, type Child } from "./dom";
 import { fetchBundleFromServer, loadUrl, looksLikeRdf, parseFiles, parseOnServer, readFiles, serverStatus, type LoadProgress, type ServerStatus } from "./loader";
 import { Model, type Bundle, type Id } from "./model";
+import { matdataMark } from "./logo";
 import { classPage } from "./views/classPage";
 import { homePage } from "./views/home";
 import { conceptPage, genericPage, propertyPage, schemePage, shapePage } from "./views/otherPages";
@@ -355,10 +356,10 @@ export class App implements AppCtx {
     t.appendChild(h("a", { class: "title", href: this.hrefRoute({ view: "home" }), onClick: (ev: Event) => {
       ev.preventDefault();
       this.goRoute({ view: "home" });
-    } }, icon("home"), " ", m?.b.title ?? "ontology-explorer", m ? h("small", { class: "hide-mobile" }, `${m.b.stats.classes} classes`) : null));
+    } }, matdataMark(), h("span", { class: "title-text" }, m?.b.title ?? "ontology-explorer"), m ? h("small", { class: "hide-mobile" }, `${m.b.stats.classes} classes`) : null));
     t.appendChild(h("span", { class: "spacer" }));
     if (m && m.b.languages.length > 1) {
-      const sel = h("select", { class: "input", title: "Language of labels", style: { padding: "3px 6px", fontSize: "12.5px" } }, m.b.languages.slice(0, 40).map((l) => h("option", { value: l }, l || "(no language)"))) as HTMLSelectElement;
+      const sel = h("select", { class: "input", title: "Language of labels", style: { width: "auto" } }, m.b.languages.slice(0, 40).map((l) => h("option", { value: l }, l || "(no language)"))) as HTMLSelectElement;
       sel.value = m.lang;
       sel.addEventListener("change", () => this.setPrefs({ lang: sel.value }));
       t.appendChild(sel);
@@ -386,7 +387,7 @@ export class App implements AppCtx {
     dlg.append(
       h("h2", null, "ontology-explorer"),
       h("p", null, "Visual explorer for OWL/RDFS ontologies, SKOS concept schemes and SHACL shapes."),
-      h("p", null, "Author: Mathias Vanden Auweele, ", h("a", { href: "https://matdata.eu", target: "_blank", rel: "noopener" }, "Matdata"), ". Licensed under the Apache License 2.0."),
+      h("p", null, "Author: Mathias Vanden Auweele, ", h("a", { href: "https://matdata.eu", target: "_blank", rel: "noopener" }, "MatData"), ". Licensed under the Apache License 2.0."),
       h("p", null, h("a", { href: "https://github.com/Matdata-eu/ontology-explorer", target: "_blank", rel: "noopener" }, "Source code"), " · ", h("a", { href: "https://github.com/Matdata-eu/ontology-explorer/issues", target: "_blank", rel: "noopener" }, "Questions, bugs and feature requests"), " · ", h("a", { href: this.server ? lic : "https://github.com/Matdata-eu/ontology-explorer/blob/main/THIRD_PARTY_NOTICES.md", target: "_blank", rel: "noopener" }, "Third-party licenses")),
       h("p", { class: "muted", style: { fontSize: "12.5px" } }, "Built with Rust (oxrdf, oxttl), WebAssembly, TypeScript and ELK (Eclipse Layout Kernel). ", this.model ? `Model built by ${this.model.b.generator}.` : ""),
       h("div", { class: "row" }, button("Close", () => dlg.close(), { cls: "primary" }))
