@@ -58,15 +58,18 @@ pub fn fetch(url: &str) -> Result<Source> {
         .filter(|n| !n.is_empty())
         .unwrap_or(url)
         .to_string();
+    // Some servers answer with a syntax other than the URL's extension says
+    // (xmlns.com sends JSON-LD for index.rdf), and some label everything as
+    // JSON or XML: a media type is believed when the bytes agree with it.
     let format = media
         .as_deref()
         .and_then(Format::from_media_type)
-        .filter(|f| {
-            !(matches!(f, Format::JsonLd)
-                && !name.ends_with(".json")
-                && !name.ends_with(".jsonld")
-                && media.as_deref().is_some_and(|m| m.contains("json"))
-                && Format::from_name(&name).is_some())
+        .filter(|f| match f {
+            Format::JsonLd | Format::RdfXml => Format::sniff(&bytes) == *f,
+            _ => true,
+        })
+        .or_else(|| {
+            Some(Format::sniff(&bytes)).filter(|f| matches!(f, Format::JsonLd | Format::RdfXml))
         })
         .or_else(|| Format::from_name(&name));
     Ok(Source::new(name, bytes, format))
