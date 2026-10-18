@@ -193,6 +193,8 @@ export interface Bundle {
   groups: Record<string, GroupInfo>;
   individuals: Record<string, IndividualInfo>;
   ontologies: Record<string, OntologyInfo>;
+  /** Turtle of the triples about each entity, unless the bundle was built without. */
+  rdf?: Record<string, string>;
   rootClasses: Id[];
   suggested?: Id;
 }

@@ -1,8 +1,9 @@
 name: Pages
 
-# Publishes the viewer on GitHub Pages with two examples: the small library
-# ontology in this repository and the ERA vocabulary, fetched from the
-# European Union Agency for Railways' GitLab at build time.
+# Publishes the viewer on GitHub Pages with the examples in
+# examples/catalog.json: the small library ontology in this repository, the ERA
+# vocabulary (fetched from the European Union Agency for Railways' GitLab) and
+# well-known vocabularies fetched from their publishers at build time.
 
 on:
   push:
@@ -10,7 +11,7 @@ on:
   release:
     types: [published]
   schedule:
-    - cron: "17 4 * * 1" # weekly, to pick up ERA vocabulary updates
+    - cron: "17 4 * * 1" # weekly, to pick up vocabulary updates
   workflow_dispatch:
 
 permissions:
@@ -33,21 +34,10 @@ jobs:
       - name: Build the example bundles
         run: |
           set -euo pipefail
-          OE=./target/release/ontology-explorer
-          mkdir -p web/dist/examples
-          $OE build examples/library/*.ttl --title "Library (example)" -o web/dist/examples/library.json
           scripts/fetch-era.sh main
-          $OE build examples/era/ontology.ttl examples/era/era-shacl/*.ttl examples/era/era-skos/*.ttl \
-            --title "ERA vocabulary" -o web/dist/examples/era.json
+          # Examples whose files cannot be fetched are left out with a warning.
+          scripts/build-examples.sh ./target/release/ontology-explorer web/dist
           cp examples/era/README.md web/dist/examples/ERA-README.md
-          cat > web/dist/examples.json <<'JSON'
-          [
-            { "title": "ERA vocabulary", "src": "examples/era.json", "focus": "http://data.europa.eu/949/OperationalPoint",
-              "description": "The European Union Agency for Railways' ontology, SKOS concept schemes and SHACL shapes (EUPL 1.2 / CC BY 4.0)" },
-            { "title": "Library (small example)", "src": "examples/library.json", "focus": "https://example.org/library#Book",
-              "description": "A small ontology with SKOS, SHACL and DASH that shows every feature" }
-          ]
-          JSON
           cp THIRD_PARTY_NOTICES.md web/dist/
           touch web/dist/.nojekyll
       - uses: actions/upload-pages-artifact@v3

@@ -25,6 +25,7 @@ pub fn build_bundle(
         title,
         generator: format!("ontology-explorer-wasm {}", env!("CARGO_PKG_VERSION")),
         max_individuals_per_class: 200,
+        rdf: true,
     };
     let bundle = ontology_explorer_core::build_bundle(&sources, &opts)
         .map_err(|e| JsValue::from_str(&format!("{e:#}")))?;

@@ -45,6 +45,9 @@ pub struct InputArgs {
     /// Keep at most this many instances per class
     #[arg(long, default_value_t = 200, value_name = "N")]
     pub max_individuals: usize,
+    /// Leave out the Turtle of each entity (smaller bundle, no "RDF" sections)
+    #[arg(long)]
+    pub no_rdf: bool,
 }
 
 #[derive(Args)]
@@ -67,6 +70,7 @@ fn options(input: &InputArgs) -> Options {
         title: input.title.clone(),
         generator: format!("ontology-explorer {}", env!("CARGO_PKG_VERSION")),
         max_individuals_per_class: input.max_individuals,
+        rdf: !input.no_rdf,
     }
 }
 

@@ -1,9 +1,10 @@
 // The application: state, routing, the shell around the views.
 import type { AppCtx, Prefs, Route } from "./ctx";
-import { button, h, type Child } from "./dom";
+import { button, copyText, h, icon, type Child } from "./dom";
 import { fetchBundleFromServer, loadUrl, looksLikeRdf, parseFiles, parseOnServer, readFiles, serverStatus, type LoadProgress, type ServerStatus } from "./loader";
 import { Model, type Bundle, type Id } from "./model";
 import { matdataMark } from "./logo";
+import { openAbout, openHelp } from "./views/dialogs";
 import { classPage } from "./views/classPage";
 import { homePage } from "./views/home";
 import { conceptPage, genericPage, propertyPage, schemePage, shapePage } from "./views/otherPages";
@@ -51,6 +52,8 @@ export class App implements AppCtx {
   private _prefs: Prefs;
   private server: ServerStatus | null = null;
   private toastEl: HTMLElement | null = null;
+  /** Where the model came from: a URL (shareable), local files, or the server. */
+  private source: { kind: "url"; url: string } | { kind: "files" } | { kind: "server" } | null = null;
   private onHash = () => this.readHash();
 
   constructor(root: HTMLElement, opts: AppOptions) {
@@ -59,6 +62,10 @@ export class App implements AppCtx {
     this._prefs = { ...DEFAULT_PREFS, ...loadPrefs() };
     if (opts.lang) this._prefs.lang = opts.lang;
     if (opts.theme) this._prefs.theme = opts.theme;
+    if (opts.routing) {
+      const lang = new URLSearchParams(location.search).get("lang");
+      if (lang !== null) this._prefs.lang = lang;
+    }
     this.topbar = h("div", { class: "topbar" });
     this.mainEl = h("div", { class: "main" }, h("div", { class: "main-inner" }));
     this.bodyEl = h("div", { class: "body no-sidebar" }, this.mainEl);
@@ -136,11 +143,43 @@ export class App implements AppCtx {
     }
   }
 
+  setParams(p: Record<string, string | undefined>): void {
+    const params = { ...this._route.params };
+    for (const [k, v] of Object.entries(p)) {
+      if (v === undefined || v === "") delete params[k];
+      else params[k] = v;
+    }
+    this._route = { ...this._route, params };
+    // Keep the address bar in step without a navigation, so it can always be shared.
+    if (this.opts.routing) history.replaceState(history.state, "", this.hashFor(this._route));
+  }
+
+  /** A link that opens the model and the current view, as far as it can be shared. */
+  shareLink(): { url: string; complete: boolean } {
+    const u = new URL(location.href);
+    u.hash = this.hashFor(this._route);
+    if (this.source?.kind === "url") u.searchParams.set("src", this.source.url);
+    else u.searchParams.delete("src");
+    if (this.model && this._prefs.lang) u.searchParams.set("lang", this._prefs.lang);
+    else u.searchParams.delete("lang");
+    return { url: u.toString(), complete: this.source?.kind !== "files" };
+  }
+
+  private async share(): Promise<void> {
+    const { url, complete } = this.shareLink();
+    const ok = await copyText(url);
+    if (!ok) {
+      window.prompt("Copy this link", url);
+      return;
+    }
+    this.toast(complete ? "Link to this view copied" : "Link copied. It opens this view only where the same files are loaded: files from your computer are not part of it.");
+  }
+
   toast(msg: string): void {
     this.toastEl?.remove();
     this.toastEl = h("div", { class: "toast" }, msg);
     this.shellEl.appendChild(this.toastEl);
-    setTimeout(() => this.toastEl?.remove(), 1800);
+    setTimeout(() => this.toastEl?.remove(), msg.length > 60 ? 5000 : 2200);
   }
 
   refresh(): void {
@@ -210,6 +249,7 @@ export class App implements AppCtx {
       return;
     }
     if (this.server?.loaded) {
+      this.source = { kind: "server" };
       try {
         this.showProgress({ stage: "download", detail: "the server's model" });
         this.setBundle(await fetchBundleFromServer());
@@ -227,6 +267,14 @@ export class App implements AppCtx {
     try {
       this.showProgress({ stage: "download", detail: url });
       const b = await loadUrl(url, (p) => this.showProgress(p), { relay: this.server?.relay });
+      this.source = { kind: "url", url };
+      if (this.opts.routing) {
+        const u = new URL(location.href);
+        if (u.searchParams.get("src") !== url) {
+          u.searchParams.set("src", url);
+          history.replaceState(history.state, "", u.toString());
+        }
+      }
       this.setBundle(b);
       if (focus) this.goTo(focus);
       else if (this.opts.routing && location.hash.length > 2) this.readHash();
@@ -239,6 +287,12 @@ export class App implements AppCtx {
 
   async openFiles(files: FileList | File[]): Promise<void> {
     try {
+      if (this.opts.routing) {
+        const u = new URL(location.href);
+        u.searchParams.delete("src");
+        history.replaceState(history.state, "", u.toString());
+      }
+      this.source = { kind: "files" };
       const list = Array.from(files).filter((f) => looksLikeRdf(f.name) || f.name.endsWith(".json"));
       if (list.length === 0) throw new Error("none of the files look like RDF (.ttl, .nt, .trig, .nq, .rdf, .owl, .jsonld) or a bundle (.json)");
       const named = await readFiles(list);
@@ -350,24 +404,25 @@ export class App implements AppCtx {
     const t = this.topbar;
     t.replaceChildren();
     const m = this.model;
-    const menuBtn = button("", () => this.side?.el.classList.toggle("open"), { icon: "menu", cls: "ghost icon-only", title: "Menu" });
-    menuBtn.classList.add("menu-btn");
-    t.appendChild(menuBtn);
+    // Only on narrow screens, where the sidebar slides in over the page.
+    if (m) t.appendChild(button("", () => this.side?.el.classList.toggle("open"), { icon: "menu", cls: "ghost icon-only menu-btn", title: "Classes, properties and search" }));
     t.appendChild(h("a", { class: "title", href: this.hrefRoute({ view: "home" }), onClick: (ev: Event) => {
       ev.preventDefault();
       this.goRoute({ view: "home" });
     } }, matdataMark(), h("span", { class: "title-text" }, m?.b.title ?? "ontology-explorer"), m ? h("small", { class: "hide-mobile" }, `${m.b.stats.classes} classes`) : null));
     t.appendChild(h("span", { class: "spacer" }));
     if (m && m.b.languages.length > 1) {
-      const sel = h("select", { class: "input", title: "Language of labels", style: { width: "auto" } }, m.b.languages.slice(0, 40).map((l) => h("option", { value: l }, l || "(no language)"))) as HTMLSelectElement;
+      const sel = h("select", { class: "btn small select", title: "Language of labels", "aria-label": "Language of labels" }, m.b.languages.slice(0, 40).map((l) => h("option", { value: l }, l || "(no language)"))) as HTMLSelectElement;
       sel.value = m.lang;
       sel.addEventListener("change", () => this.setPrefs({ lang: sel.value }));
       t.appendChild(sel);
     }
+    if (m) t.appendChild(button("Share", () => void this.share(), { icon: "share", cls: "small share-btn", title: "Copy a link to exactly this view" }));
     if (m) t.appendChild(button("Open…", () => this.showOpen(), { icon: "folder", cls: "small hide-mobile", title: "Load other files" }));
     const dark = this.isDark();
     t.appendChild(button("", () => this.setPrefs({ theme: this.isDark() ? "light" : "dark" }), { icon: dark ? "sun" : "moon", cls: "ghost icon-only", title: "Switch theme" }));
-    t.appendChild(button("", () => this.about(), { icon: "info", cls: "ghost icon-only", title: "About" }));
+    t.appendChild(button("", () => openHelp(this.shellEl), { icon: "help", cls: "ghost icon-only", title: "Help" }));
+    t.appendChild(button("", () => this.about(), { icon: "info", cls: "ghost icon-only about-btn", title: "About" }));
   }
 
   private isDark(): boolean {
@@ -382,43 +437,60 @@ export class App implements AppCtx {
   }
 
   private about(): void {
-    const dlg = h("dialog", { class: "about" }) as HTMLDialogElement;
-    const lic = new URL("licenses", document.baseURI).href;
-    dlg.append(
-      h("h2", null, "ontology-explorer"),
-      h("p", null, "Visual explorer for OWL/RDFS ontologies, SKOS concept schemes and SHACL shapes."),
-      h("p", null, "Author: Mathias Vanden Auweele, ", h("a", { href: "https://matdata.eu", target: "_blank", rel: "noopener" }, "MatData"), ". Licensed under the Apache License 2.0."),
-      h("p", null, h("a", { href: "https://github.com/Matdata-eu/ontology-explorer", target: "_blank", rel: "noopener" }, "Source code"), " · ", h("a", { href: "https://github.com/Matdata-eu/ontology-explorer/issues", target: "_blank", rel: "noopener" }, "Questions, bugs and feature requests"), " · ", h("a", { href: this.server ? lic : "https://github.com/Matdata-eu/ontology-explorer/blob/main/THIRD_PARTY_NOTICES.md", target: "_blank", rel: "noopener" }, "Third-party licenses")),
-      h("p", { class: "muted", style: { fontSize: "12.5px" } }, "Built with Rust (oxrdf, oxttl), WebAssembly, TypeScript and ELK (Eclipse Layout Kernel). ", this.model ? `Model built by ${this.model.b.generator}.` : ""),
-      h("div", { class: "row" }, button("Close", () => dlg.close(), { cls: "primary" }))
-    );
-    this.shellEl.appendChild(dlg);
-    dlg.addEventListener("close", () => dlg.remove());
-    dlg.showModal();
+    const lic = this.server ? new URL("licenses", document.baseURI).href : "https://github.com/Matdata-eu/ontology-explorer/blob/main/THIRD_PARTY_NOTICES.md";
+    openAbout(this.shellEl, { licensesUrl: lic, generator: this.model?.b.generator });
   }
 
   // ---- open / progress / errors --------------------------------------------
   showOpen(): void {
-    const drop = h("div", { class: "dropzone" });
-    const fileInput = h("input", { type: "file", multiple: true, accept: ".ttl,.turtle,.nt,.trig,.nq,.rdf,.owl,.xml,.jsonld,.json,.gz", style: { display: "none" }, onChange: (ev: Event) => {
+    const fileInput = h("input", { type: "file", multiple: true, accept: ".ttl,.turtle,.nt,.trig,.nq,.rdf,.owl,.xml,.jsonld,.json,.gz", hidden: true, onChange: (ev: Event) => {
       const files = (ev.target as HTMLInputElement).files;
       if (files?.length) this.openFiles(files);
     } }) as HTMLInputElement;
-    const urlInput = h("input", { class: "input", type: "url", placeholder: "https://…/ontology.ttl or a bundle.json", "aria-label": "URL" }) as HTMLInputElement;
-    const form = h("form", { onSubmit: (ev: Event) => {
+    const drop = h(
+      "div",
+      { class: "dropzone" },
+      icon("folder", "drop-icon"),
+      h("p", null, h("strong", null, "Drop files here"), " or ", h("button", { type: "button", class: "linkish", onClick: () => fileInput.click() }, "choose them")),
+      h("p", { class: "muted small" }, "Turtle, RDF/XML, JSON-LD, N-Triples, TriG, N-Quads, or a bundle made with ", h("code", null, "ontology-explorer build"), "."),
+      fileInput
+    );
+    drop.addEventListener("click", (ev) => {
+      if (ev.target === drop) fileInput.click();
+    });
+    const urlInput = h("input", { class: "input", type: "url", placeholder: "https://example.org/ontology.ttl", "aria-label": "URL of an ontology or bundle", required: true }) as HTMLInputElement;
+    const form = h("form", { class: "url-form", onSubmit: (ev: Event) => {
       ev.preventDefault();
       if (urlInput.value.trim()) this.openUrl(urlInput.value.trim());
-    } }, urlInput, button("Open URL", () => form.requestSubmit(), { cls: "primary" }));
-    drop.append(
-      h("h2", null, "Open an ontology"),
-      h("p", null, "Drop ontology, SKOS and SHACL files here (Turtle, RDF/XML, JSON-LD, N-Triples, TriG, N-Quads), or a bundle.json made with ", h("code", null, "ontology-explorer build"), ". Files are read in your browser; nothing is uploaded."),
-      h("div", { class: "actions" }, button("Choose files", () => fileInput.click(), { icon: "folder", cls: "primary" }), fileInput),
-      form,
-      this.server && !this.server.relay ? h("p", { class: "faint", style: { fontSize: "12px" } }, "URLs must allow cross-origin requests; start the server with --relay to fetch any URL.") : ""
+    } }, urlInput, h("button", { type: "submit", class: "btn primary" }, "Open"));
+    const examples = h("div", { class: "examples" });
+    const page = h(
+      "div",
+      { class: "open-page" },
+      this.model ? h("p", null, button("Back", () => this.render(), { icon: "back", cls: "small ghost" })) : null,
+      h(
+        "header",
+        { class: "open-hero" },
+        h("h1", null, this.model ? "Open another model" : "Explore an ontology"),
+        h("p", { class: "lead" }, "Classes, properties, SKOS vocabularies and SHACL shapes as diagrams and readable pages. Give the ontology, its shapes and its vocabularies together; everything stays in your browser.")
+      ),
+      h(
+        "div",
+        { class: "open-grid" },
+        h("section", { class: "card open-card" }, h("h2", null, "From your computer"), drop),
+        h(
+          "section",
+          { class: "card open-card" },
+          h("h2", null, "From the web"),
+          h("p", { class: "muted" }, "The address of an RDF file or of a bundle."),
+          form,
+          this.server && !this.server.relay ? h("p", { class: "muted small" }, "The site must allow cross-origin requests; start the server with ", h("code", null, "--relay"), " to fetch any URL.") : h("p", { class: "muted small" }, "Add ", h("code", null, "?src="), " and the address to this page's link to open it straight away.")
+        )
+      ),
+      examples
     );
-    const page = h("div", null, this.model ? h("p", null, button("Back", () => this.render(), { icon: "back", cls: "small" })) : h("div", { class: "page-head" }, h("h1", null, "ontology-explorer"), h("span", { class: "muted" }, "ontologies, vocabularies and shapes as diagrams and readable pages")), drop, h("div", { class: "examples", style: { marginTop: "14px" } }));
     this.setMain(page, this.footer());
-    this.loadExamples(page.querySelector(".examples") as HTMLElement);
+    this.loadExamples(examples);
   }
 
   private async loadExamples(host: HTMLElement): Promise<void> {
@@ -428,20 +500,33 @@ export class App implements AppCtx {
     try {
       const r = await fetch(url, { cache: "no-cache" });
       if (!r.ok) return;
-      const list = (await r.json()) as { title: string; src: string; description?: string; focus?: string }[];
+      const list = (await r.json()) as { title: string; src: string; description?: string; focus?: string; publisher?: string }[];
       if (!Array.isArray(list) || list.length === 0) return;
-      host.appendChild(h("span", { class: "muted", style: { alignSelf: "center" } }, "Examples:"));
-      for (const ex of list) {
-        host.appendChild(button(ex.title, () => {
-          if (this.opts.routing) {
-            const u = new URL(location.href);
-            u.searchParams.set("src", ex.src);
-            u.hash = ex.focus ? `#/e/${encodeURIComponent(ex.focus)}` : "";
-            history.replaceState(null, "", u.toString());
-          }
-          this.openUrl(ex.src, ex.focus);
-        }, { title: ex.description, cls: "small" }));
-      }
+      const base = new URL(url, document.baseURI);
+      host.append(
+        h("h2", null, "Examples"),
+        h(
+          "div",
+          { class: "example-grid" },
+          list.map((ex) =>
+            h(
+              "button",
+              { type: "button", class: "example", onClick: () => {
+                const src = new URL(ex.src, base).href;
+                if (this.opts.routing) {
+                  const u = new URL(location.href);
+                  u.hash = ex.focus ? `#/e/${encodeURIComponent(ex.focus)}` : "";
+                  history.replaceState(history.state, "", u.toString());
+                }
+                this.openUrl(src, ex.focus);
+              } },
+              h("strong", null, ex.title),
+              ex.description ? h("span", { class: "muted" }, ex.description) : null,
+              ex.publisher ? h("span", { class: "faint small" }, ex.publisher) : null
+            )
+          )
+        )
+      );
     } catch {
       /* no examples file */
     }

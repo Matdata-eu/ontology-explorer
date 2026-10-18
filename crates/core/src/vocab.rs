@@ -6,6 +6,7 @@ pub const RDF: &str = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
 pub const RDFS: &str = "http://www.w3.org/2000/01/rdf-schema#";
 pub const OWL: &str = "http://www.w3.org/2002/07/owl#";
 pub const XSD: &str = "http://www.w3.org/2001/XMLSchema#";
+pub const XSD_STRING: &str = "http://www.w3.org/2001/XMLSchema#string";
 pub const SKOS: &str = "http://www.w3.org/2004/02/skos/core#";
 pub const SH: &str = "http://www.w3.org/ns/shacl#";
 pub const DASH: &str = "http://datashapes.org/dash#";
