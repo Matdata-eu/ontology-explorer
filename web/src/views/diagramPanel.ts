@@ -88,7 +88,7 @@ export function diagramPanel(ctx: AppCtx, focus: Id, opts: { tall?: boolean } = 
     ctx.setPrefs({ direction: ctx.prefs.direction === "DOWN" ? "RIGHT" : "DOWN" });
     run(false);
   }, { cls: "small icon-only", icon: "tree", title: "Flip layout direction" });
-  const attrsSel = h("select", { class: "input", title: "Which boxes list their attributes", style: { padding: "2px 6px", fontSize: "12px" } }, h("option", { value: "focus" }, "Attributes: focus"), h("option", { value: "all" }, "Attributes: all"), h("option", { value: "none" }, "Attributes: none")) as HTMLSelectElement;
+  const attrsSel = h("select", { class: "input", title: "Which boxes list their attributes (properties with a literal value; links to other classes are drawn as arrows)", style: { padding: "2px 6px", fontSize: "12px" } }, h("option", { value: "focus" }, "Attributes of this class"), h("option", { value: "all" }, "Attributes of every class"), h("option", { value: "none" }, "No attributes")) as HTMLSelectElement;
   attrsSel.value = o.attributes;
   attrsSel.addEventListener("change", () => {
     o.attributes = attrsSel.value as NeighborhoodOptions["attributes"];
