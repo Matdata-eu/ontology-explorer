@@ -162,7 +162,9 @@ The element works the same in React, Vue, Angular, Svelte or plain HTML.
 | `oe-loaded` | `{ bundle }` |
 | `oe-error` | `{ error }` |
 
-The component renders in a shadow root. Its colours are CSS custom properties
+The viewer follows the MatData design system. The component renders in a shadow
+root and adds the Barlow and JetBrains Mono font faces to the page once. Its
+colours are CSS custom properties
 (`--oe-accent`, `--oe-bg`, `--oe-text` and others in `web/src/styles.css`) that a
 host page can override on the element.
 
@@ -214,7 +216,7 @@ Please open an issue on GitHub:
 
 ## Credits
 
-ontology-explorer is written by Mathias Vanden Auweele ([Matdata](https://matdata.eu/)).
+ontology-explorer is written by Mathias Vanden Auweele ([MatData](https://matdata.eu/)).
 
 It is built on these open source projects:
 
@@ -229,6 +231,9 @@ It is built on these open source projects:
   [clap](https://github.com/clap-rs/clap) for the command line (MIT / Apache-2.0)
 - [Vite](https://vite.dev) and [TypeScript](https://www.typescriptlang.org) to
   build the viewer
+- The [Barlow](https://github.com/jpt/barlow) and
+  [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) fonts, self-hosted
+  through [Fontsource](https://fontsource.org) (SIL Open Font License 1.1)
 - The popular prefixes of [prefix.cc](https://prefix.cc), for shortening IRIs
 - The [ERA vocabulary](https://gitlab.com/era-europa-eu/public/interoperable-data-programme/era-ontology/era-ontology)
   of the European Union Agency for Railways, the reference large example

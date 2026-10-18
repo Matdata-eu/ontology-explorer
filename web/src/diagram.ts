@@ -4,8 +4,11 @@ import { clear, downloadBlob, s } from "./dom";
 import type { AttrLine, EdgeSpec, GraphSpec, NodeSpec } from "./graph";
 import { layout, type ElkNode } from "./layout";
 
-const FONT = '12px system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
-const NAME_FONT = '650 13px system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+const SANS = 'Barlow, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+const MONO = '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+const FONT = `12.5px ${SANS}`;
+const NAME_FONT = `600 14px ${SANS}`;
+const STEREO_FONT = `11px ${SANS}`;
 const LINE = 17;
 const PAD_X = 12;
 const HEAD_H = 30;
@@ -24,7 +27,7 @@ function measure(text: string, font = FONT): number {
   return ctx.measureText(text).width;
 }
 
-const EDGE_FONT = "11px system-ui";
+const EDGE_FONT = `11px ${MONO}`;
 /** Long property names would stretch the layout; the full name shows on hover. */
 function edgeLabel(text: string): string {
   return ellipsize(text, 170, EDGE_FONT);
@@ -64,7 +67,7 @@ function size(n: NodeSpec): Sized {
     rows.push(a);
   }
   let w = Math.max(MIN_W, measure(n.name, NAME_FONT) + PAD_X * 2 + 8);
-  if (n.stereotype) w = Math.max(w, measure(n.stereotype, "10.5px system-ui") + PAD_X * 2);
+  if (n.stereotype) w = Math.max(w, measure(n.stereotype, STEREO_FONT) + PAD_X * 2);
   for (const r of rows) w = Math.max(w, measure("header" in r ? r.header : attrText(r)) + PAD_X * 2 + 4);
   if (n.hiddenAttrs) w = Math.max(w, measure(`+${n.hiddenAttrs} more…`) + PAD_X * 2);
   w = Math.min(MAX_W, Math.ceil(w));
@@ -135,6 +138,9 @@ export class Diagram {
   async render(spec: GraphSpec, opts: RenderOptions): Promise<void> {
     const my = ++this.seq;
     this.spec = spec;
+    // Boxes are sized by measuring text, so wait for the web fonts.
+    await document.fonts?.ready;
+    if (my !== this.seq) return;
     const sizes = new Map<string, Sized>();
     for (const n of spec.nodes) sizes.set(n.key, size(n));
     const algorithm = opts.algorithm ?? "layered";
@@ -275,14 +281,14 @@ export class Diagram {
   private drawNode(n: NodeSpec, x: number, y: number, sz: Sized): SVGGElement {
     const cls = ["node", n.kind, n.focus ? "focus" : "", n.external ? "external" : ""].filter(Boolean).join(" ");
     const g = s("g", { class: cls, transform: `translate(${x} ${y})`, "data-key": n.key });
-    g.appendChild(s("rect", { class: "box", width: sz.w, height: sz.h, rx: 4 }));
+    g.appendChild(s("rect", { class: "box", width: sz.w, height: sz.h, rx: 10 }));
     const headH = HEAD_H + (n.stereotype ? STEREO_H : 0);
-    g.appendChild(s("rect", { class: "head", width: sz.w, height: headH, rx: 4 }));
+    g.appendChild(s("rect", { class: "head", width: sz.w, height: headH, rx: 10 }));
     // Square off the bottom of the head when there is a body.
-    if (sz.rows.length || n.hiddenAttrs) g.appendChild(s("rect", { class: "head", y: headH - 6, width: sz.w, height: 6 }));
+    if (sz.rows.length || n.hiddenAttrs) g.appendChild(s("rect", { class: "head", y: headH - 10, width: sz.w, height: 10 }));
     let ty = 0;
     if (n.stereotype) {
-      g.appendChild(s("text", { class: "stereo", x: sz.w / 2, y: 11 }, ellipsize(n.stereotype, sz.w - 10, "10.5px system-ui")));
+      g.appendChild(s("text", { class: "stereo", x: sz.w / 2, y: 11 }, ellipsize(n.stereotype, sz.w - 10, STEREO_FONT)));
       ty = STEREO_H;
     }
     const nameCls = ["name", n.abstract ? "abstract" : "", n.deprecated ? "deprecated" : ""].filter(Boolean).join(" ");
@@ -489,34 +495,35 @@ export class Diagram {
   private inlineCss(): string {
     const v = (n: string) => this.cssVar(n);
     return `
-.node rect.box{fill:${v("--oe-panel")};stroke:${v("--oe-border-strong")};stroke-width:1.2}
-.node.focus rect.box{stroke:${v("--oe-accent")};stroke-width:2}
+.node rect.box{fill:${v("--oe-panel")};stroke:${v("--oe-border-strong")};stroke-width:1}
+.node.focus rect.box{stroke:${v("--oe-highlight")};stroke-width:3}
 .node.external rect.box{stroke-dasharray:4 3}
-.node .head{fill:${v("--oe-class-bg")}}
-.node.scheme .head{fill:${v("--oe-scheme-bg")}}
-text{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;font-size:12px;fill:${v("--oe-text")};dominant-baseline:middle}
-text.name{font-weight:650;font-size:13px;text-anchor:middle}
+.node .head{fill:${v("--oe-class")}}
+.node .head ~ text.name,.node .head ~ text.stereo{fill:${v("--oe-on-accent")}}
+.node.external .head,.node.scheme .head{fill:${v("--oe-accent-bg")}}
+.node.external .head ~ text.name,.node.scheme .head ~ text.name{fill:${v("--oe-accent-strong")}}
+.node.external .head ~ text.stereo,.node.scheme .head ~ text.stereo{fill:${v("--oe-accent-strong")}}
+.node.shape .head,.node.datatype .head{fill:${v("--oe-panel-2")}}
+.node.shape .head ~ text.name,.node.datatype .head ~ text.name{fill:${v("--oe-text")}}
+.node.shape .head ~ text.stereo,.node.datatype .head ~ text.stereo{fill:${v("--oe-text-2")}}
+text{font-family:Barlow,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;font-size:12.5px;fill:${v("--oe-text")};dominant-baseline:middle}
+text.name{font-weight:600;font-size:14px;text-anchor:middle}
 text.name.abstract{font-style:italic}
-text.stereo{font-size:10.5px;fill:${v("--oe-text-2")};text-anchor:middle}
-text.attr{font-size:11.5px}
+text.stereo{font-size:11px;text-anchor:middle}
 text.attr .type{fill:${v("--oe-text-2")}}
-text.attr .mult{fill:${v("--oe-text-3")}}
+text.attr .mult{fill:${v("--oe-text-2")}}
 text.attr.inh{fill:${v("--oe-text-2")}}
-text.more{fill:${v("--oe-accent")};font-size:11px}
-text.deprecated{text-decoration:line-through;fill:${v("--oe-text-3")}}
-line.sep{stroke:${v("--oe-border-strong")};stroke-width:1}
-.edge path{fill:none;stroke:${v("--oe-text-2")};stroke-width:1.3}
+text.more{fill:${v("--oe-accent")};font-size:12px}
+text.deprecated{text-decoration:line-through}
+line.sep{stroke:${v("--oe-border")};stroke-width:1}
+.edge path{fill:none;stroke:${v("--oe-border-strong")};stroke-width:1.5}
 .edge.gen path{stroke:${v("--oe-text")}}
-.edge.assoc path{stroke:${v("--oe-class")}}
-.edge.comp path{stroke:${v("--oe-shape")}}
-.edge.scheme path{stroke:${v("--oe-scheme")};stroke-dasharray:5 3}
+.edge.scheme path{stroke-dasharray:5 3}
 .edge.incoming path{stroke-dasharray:2 3}
-.edge text{font-size:11px;fill:${v("--oe-text-2")};paint-order:stroke;stroke:${v("--oe-panel")};stroke-width:3px;stroke-linejoin:round}
-.edge text.mult{fill:${v("--oe-text-3")}}
-marker path.tri{fill:${v("--oe-panel")};stroke:${v("--oe-text")};stroke-width:1.2}
-marker path.arrow{fill:none;stroke:${v("--oe-class")};stroke-width:1.3}
-marker path.arrow-scheme{fill:none;stroke:${v("--oe-scheme")};stroke-width:1.3}
-marker path.diamond{fill:${v("--oe-shape")};stroke:${v("--oe-shape")}}
+.edge text{font-family:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;font-size:11px;fill:${v("--oe-text-2")};paint-order:stroke;stroke:${v("--oe-panel")};stroke-width:3px;stroke-linejoin:round}
+marker path.tri{fill:${v("--oe-panel")};stroke:${v("--oe-text")};stroke-width:1.5}
+marker path.arrow,marker path.arrow-scheme{fill:none;stroke:${v("--oe-border-strong")};stroke-width:1.5}
+marker path.diamond{fill:${v("--oe-text")};stroke:${v("--oe-text")}}
 `;
   }
 

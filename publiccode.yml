@@ -17,7 +17,7 @@ developmentStatus: beta
 softwareType: standalone/other
 organisation:
   uri: https://matdata.eu
-  name: Matdata
+  name: MatData
 intendedAudience:
   scope:
   - government
@@ -41,12 +41,12 @@ description:
     - Runs in the browser; web component for embedding
 legal:
   license: Apache-2.0
-  mainCopyrightOwner: Matdata
+  mainCopyrightOwner: MatData
 maintenance:
   type: internal
   contacts:
   - name: Mathias Vanden Auweele
-    affiliation: Matdata
+    affiliation: MatData
 localisation:
   localisationReady: false
   availableLanguages:

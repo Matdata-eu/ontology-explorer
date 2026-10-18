@@ -2,6 +2,7 @@
 import { App } from "./app";
 import type { Bundle } from "./model";
 import css from "./styles.css?inline";
+import { addFonts } from "./fonts";
 
 let sheet: CSSStyleSheet | null = null;
 function styles(): CSSStyleSheet {
@@ -30,6 +31,7 @@ export class OntologyExplorerElement extends HTMLElement {
 
   connectedCallback(): void {
     if (this.app) return;
+    addFonts();
     const shadow = this.shadowRoot ?? this.attachShadow({ mode: "open" });
     shadow.adoptedStyleSheets = [styles()];
     const root = document.createElement("div");
