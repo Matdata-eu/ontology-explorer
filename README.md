@@ -16,7 +16,7 @@ large models and serves the viewer locally.
 [ERA vocabulary](https://data-interop.era.europa.eu/era-vocabulary/) of the European
 Union Agency for Railways (147 classes, 800 properties, 131 concept schemes,
 15,000 concepts, 1,100 property shapes), the railML ontology, FOAF, SKOS, SHACL,
-DCMI terms, ORG, GeoSPARQL, OWL-Time, QUDT, DASH or a small example library ontology.
+DCMI terms, ORG, GeoSPARQL 1.0, OWL-Time, QUDT, DASH or a small example library ontology.
 
 ![Class page with its diagram](docs/screenshot-class.png)
 
