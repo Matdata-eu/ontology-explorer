@@ -15,7 +15,8 @@ large models and serves the viewer locally.
 **Try it:** <https://matdata-eu.github.io/ontology-explorer/> with the
 [ERA vocabulary](https://data-interop.era.europa.eu/era-vocabulary/) of the European
 Union Agency for Railways (147 classes, 800 properties, 131 concept schemes,
-15,000 concepts, 1,100 property shapes) or a small example library ontology.
+15,000 concepts, 1,100 property shapes), the railML ontology, FOAF, SKOS, SHACL,
+DCMI terms, ORG, GeoSPARQL, OWL-Time, QUDT, DASH or a small example library ontology.
 
 ![Class page with its diagram](docs/screenshot-class.png)
 
@@ -28,12 +29,16 @@ Union Agency for Railways (147 classes, 800 properties, 131 concept schemes,
 - **UML-like diagrams.** Generalisation arrows, associations with multiplicities,
   composition diamonds, value sets drawn as `«concept scheme»` boxes. Double-click
   a box to add its neighbours, change the depth, direction and which attributes
-  show. Export as SVG, PNG, PlantUML or Mermaid.
+  show, or give the diagram the full screen. Properties and shapes have their own
+  diagram. Export as SVG, PNG, PlantUML or Mermaid.
 - **Overview map** of every class, by namespace, with or without associations.
 - **SKOS vocabularies** as browsable trees with notations, broader/narrower,
   mappings, and the properties that use them as value sets.
 - **SHACL shapes** merged into the class tables, and a page per shape with its
   targets, property shapes, node constraints and SPARQL constraints.
+- **The RDF behind every page.** The triples about each class, property, concept
+  or shape as Turtle, with blank nodes and lists written inline and every name
+  linked to its page.
 - **DASH aware, works without it.** `sh:group` and `sh:order` group and order the
   rows and diagram attributes, `dash:propertyRole` marks labels and identifiers,
   `dash:abstract` marks abstract classes, `dash:composite` draws composition,
@@ -46,8 +51,10 @@ Union Agency for Railways (147 classes, 800 properties, 131 concept schemes,
   The ERA vocabulary (100,000 triples) is indexed in about a second, in Rust,
   either ahead of time or in the browser through WebAssembly. Diagram layout runs
   in a web worker with the [Eclipse Layout Kernel](https://eclipse.dev/elk/).
-- **Labels in every language** the data has, light and dark themes, links you can
-  share to any class, property, concept or shape.
+- **Labels in every language** the data has, light and dark themes, and a Share
+  button whose link opens exactly the same view: the page, the diagram's options,
+  the boxes you added and the zoom.
+- **A short manual** in the viewer (the question mark in the top bar).
 
 | | |
 | --- | --- |
@@ -103,8 +110,10 @@ ontology-explorer build ontology.ttl shapes.ttl vocabularies/*.ttl -o site/model
 ```
 
 Then open the viewer with `?src=model.json`, or embed it (below). The bundle is
-plain JSON. Web servers usually compress it: the ERA bundle is 7 MB, 0.9 MB over
-the wire. `--gzip` also writes a `.json.gz` copy for hosts that do not compress.
+plain JSON. Web servers usually compress it: the ERA bundle is 13 MB, 1.7 MB over
+the wire. `--gzip` also writes a `.json.gz` copy for hosts that do not compress,
+and `--no-rdf` leaves out the Turtle of each entity (the ERA bundle is then 7 MB,
+0.9 MB over the wire).
 
 To serve a model with Docker:
 
@@ -123,6 +132,11 @@ Every view has its own URL, so links can be shared or put in documentation:
 | `#/e/<IRI>` or `#/e/<curie>` | the page of a class, property, concept, scheme or shape |
 | `#/e/<IRI>?tab=table` | a class page with the table instead of the diagram |
 | `#/overview` | the overview map |
+| `?lang=nl` | labels in that language |
+
+Diagram options, the boxes added to a diagram and its pan and zoom are kept in the
+link too, so the address bar and the Share button always hold a link to the exact
+view.
 
 ### Embed the web component
 
@@ -193,6 +207,7 @@ The repository is a Rust workspace with a TypeScript web viewer:
 | `crates/wasm` | The core compiled to WebAssembly for the browser |
 | `web/` | The viewer: app, web component, diagrams (Vite and TypeScript) |
 | `examples/library` | A small ontology with SKOS, SHACL and DASH that uses every feature |
+| `examples/catalog.json` | The examples on the published site; `scripts/build-examples.sh` builds them |
 
 You need Rust with the `wasm32-unknown-unknown` target, `wasm-bindgen-cli` at the
 version in `Cargo.lock`, and Node.js 20 or later.

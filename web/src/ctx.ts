@@ -35,6 +35,10 @@ export interface AppCtx {
   hrefRoute(r: Partial<Route>): string;
   setPrefs(p: Partial<Prefs>): void;
   toast(msg: string): void;
+  /** Change the current route's parameters in place (no navigation), so the link always matches the view. */
+  setParams(p: Record<string, string | undefined>): void;
+  /** A link to the model and the current view; `complete` is false for local files. */
+  shareLink(): { url: string; complete: boolean };
   /** Re-render the current page (after a preference change). */
   refresh(): void;
 }

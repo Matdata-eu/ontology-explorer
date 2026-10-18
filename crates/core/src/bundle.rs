@@ -393,6 +393,9 @@ pub struct Bundle {
     pub ontologies: BTreeMap<Id, OntologyInfo>,
     /// Ids of the classes with no super class inside the bundle, sorted by label.
     pub root_classes: Vec<Id>,
+    /// The triples about each entity as Turtle, when the bundle keeps them.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub rdf: BTreeMap<Id, String>,
     /// Suggested entry point: the class with the most connections.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub suggested: Option<Id>,

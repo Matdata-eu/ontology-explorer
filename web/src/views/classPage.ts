@@ -1,7 +1,7 @@
 import type { AppCtx } from "../ctx";
 import { button, h, plural } from "../dom";
 import type { Entity } from "../model";
-import { annotations, chips, link, pageHead, propTable, section } from "./common";
+import { pageTail, chips, link, pageHead, propTable, section } from "./common";
 import { diagramPanel } from "./diagramPanel";
 
 export function classPage(ctx: AppCtx, e: Entity): HTMLElement {
@@ -64,8 +64,7 @@ export function classPage(ctx: AppCtx, e: Entity): HTMLElement {
   if ((ci.instances ?? []).length) usage.appendChild(h("div", { class: "card" }, h("h3", { style: { margin: "0 0 8px", fontSize: "14px" } }, plural(ci.instances!.length, "Instance")), chips(ctx, ci.instances!, { max: 30 })));
   if (usage.childElementCount) page.append(section("Usage"), usage);
 
-  const ann = annotations(ctx, e);
-  if (ann) page.appendChild(ann);
+  pageTail(ctx, e, page);
   void link;
   return page;
 }

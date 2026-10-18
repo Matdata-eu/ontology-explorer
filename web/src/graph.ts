@@ -1,7 +1,7 @@
 // Builds the graph a diagram shows: which boxes, which arrows, what text.
 import type { Id, Model, PropRow } from "./model";
 
-export type NodeKind = "class" | "scheme" | "more";
+export type NodeKind = "class" | "scheme" | "shape" | "more";
 
 export interface AttrLine {
   text: string;
@@ -251,6 +251,122 @@ export function buildNeighborhood(m: Model, o: NeighborhoodOptions): GraphSpec {
     }
   }
   return { nodes: [...nodes.values()], edges: [...edges.values()], omitted };
+}
+
+/** One attribute line for a row drawn inside a box. */
+function attrLine(m: Model, r: PropRow, inherited = false): AttrLine {
+  return {
+    text: m.rowName(r),
+    type: r.datatype !== undefined ? m.entity(r.datatype).curie.replace(/^xsd:/, "") : r.scheme !== undefined ? m.label(r.scheme) : r.nodeKind ?? undefined,
+    mult: m.multiplicity(r),
+    inherited,
+    deprecated: r.property !== undefined ? m.entity(r.property).deprecated : false,
+    group: r.group !== undefined ? m.label(r.group) : undefined,
+    id: r.property,
+  };
+}
+
+function plainClassNode(m: Model, id: Id, attrs: AttrLine[] = []): NodeSpec {
+  const e = m.entity(id);
+  const stereo: string[] = [];
+  if (m.cls(id)?.abstract) stereo.push("abstract");
+  if (e.deprecated) stereo.push("deprecated");
+  if (m.isExternal(id)) stereo.push("external");
+  return { key: `c${id}`, id, kind: "class", name: m.label(id), stereotype: stereo.length ? `«${stereo.join(", ")}»` : undefined, abstract: m.cls(id)?.abstract, deprecated: e.deprecated, external: m.isExternal(id), attrs, hiddenAttrs: 0 };
+}
+
+function shapeNode(m: Model, id: Id, attrs: AttrLine[] = [], hidden = 0, focus = false): NodeSpec {
+  const si = m.shape(id);
+  return { key: `h${id}`, id, kind: "shape", name: m.label(id), stereotype: si?.deactivated ? "«node shape, deactivated»" : "«node shape»", deprecated: m.entity(id).deprecated, focus, attrs, hiddenAttrs: hidden };
+}
+
+/** A small graph builder with a cap on the number of boxes. */
+function collector(max: number) {
+  const nodes = new Map<string, NodeSpec>();
+  const edges = new Map<string, EdgeSpec>();
+  let omitted = 0;
+  return {
+    nodes,
+    node(n: NodeSpec | (() => NodeSpec), key: string): boolean {
+      if (nodes.has(key)) return true;
+      if (nodes.size >= max) {
+        omitted++;
+        return false;
+      }
+      nodes.set(key, typeof n === "function" ? n() : n);
+      return true;
+    },
+    edge(e: EdgeSpec) {
+      if (nodes.has(e.from) && nodes.has(e.to) && !edges.has(e.key)) edges.set(e.key, e);
+    },
+    done: (): GraphSpec => ({ nodes: [...nodes.values()], edges: [...edges.values()], omitted }),
+  };
+}
+
+/** A property between the classes that use it (or its domain) and what it points at. */
+export function buildPropertyGraph(m: Model, pid: Id, max = 40): GraphSpec {
+  const pi = m.prop(pid) ?? {};
+  const g = collector(max);
+  const name = m.label(pid);
+  const holders = [...new Set([...(pi.usedByClasses ?? []), ...(pi.domain ?? [])])];
+  const pointAt = (from: string, r: Pick<PropRow, "range" | "scheme" | "composite" | "path">, label: string, mult?: string) => {
+    for (const t of linkTargets(m, r as PropRow)) {
+      if (g.node(() => plainClassNode(m, t), `c${t}`)) g.edge({ key: `a${from}-${t}`, from, to: `c${t}`, kind: r.composite ? "comp" : "assoc", label, mult, id: pid });
+    }
+    if (r.scheme !== undefined && g.node(() => schemeNode(m, r.scheme!), `s${r.scheme}`)) g.edge({ key: `s${from}-${r.scheme}`, from, to: `s${r.scheme}`, kind: "scheme", label, mult, id: pid });
+  };
+  for (const c of holders) {
+    const row = m.cls(c)?.props?.find((x) => x.property === pid && x.inheritedFrom === undefined && !x.inverse);
+    const attrs = row && isAttribute(m, row) ? [attrLine(m, row)] : [];
+    if (!g.node(() => plainClassNode(m, c, attrs), `c${c}`)) continue;
+    // The class may already be there as a target; give it the attribute line.
+    const n = g.nodes.get(`c${c}`)!;
+    if (attrs.length && !n.attrs.length) n.attrs = attrs;
+    if (row && !isAttribute(m, row)) pointAt(`c${c}`, row, m.rowName(row), m.multiplicity(row));
+    else if (!row) pointAt(`c${c}`, { range: pi.range, scheme: pi.scheme, path: "" }, name);
+  }
+  // The shapes that constrain it, pointing at the same targets.
+  for (const s of pi.usedByShapes ?? []) {
+    const r = m.shape(s)?.properties?.find((x) => x.property === pid && !x.inverse);
+    if (!r || m.shape(s)?.implicitTarget) continue;
+    const attrs = isAttribute(m, r) ? [attrLine(m, r)] : [];
+    if (!g.node(() => shapeNode(m, s, attrs), `h${s}`)) continue;
+    if (!attrs.length) pointAt(`h${s}`, r, m.rowName(r), m.multiplicity(r));
+  }
+  return g.done();
+}
+
+/** A node shape with its property shapes, its targets and the shapes and classes it points at. */
+export function buildShapeGraph(m: Model, sid: Id, opts: { open: boolean; hidden: boolean } = { open: false, hidden: false }, max = 40): GraphSpec {
+  const si = m.shape(sid) ?? {};
+  const g = collector(max);
+  const rows = (si.properties ?? []).filter((r) => opts.hidden || !r.hidden);
+  const lines = rows.filter((r) => isAttribute(m, r)).map((r) => attrLine(m, r));
+  const cap = 28;
+  const shown = opts.open || lines.length <= cap ? lines : lines.slice(0, cap);
+  const me = `h${sid}`;
+  g.node(shapeNode(m, sid, shown, lines.length - shown.length, true), me);
+  for (const c of [...new Set([...(si.targetClass ?? []), ...(si.applicableTo ?? [])])]) {
+    if (si.implicitTarget && c === sid) continue;
+    if (g.node(() => plainClassNode(m, c), `c${c}`)) g.edge({ key: `t${sid}-${c}`, from: me, to: `c${c}`, kind: "incoming", label: "targets" });
+  }
+  for (const r of rows) {
+    if (isAttribute(m, r)) continue;
+    const label = m.rowName(r);
+    const mult = m.multiplicity(r);
+    for (const t of linkTargets(m, r)) {
+      if (g.node(() => plainClassNode(m, t), `c${t}`)) g.edge({ key: `a${r.path}-${t}`, from: me, to: `c${t}`, kind: r.composite ? "comp" : "assoc", label, mult, id: r.property });
+    }
+    if (r.scheme !== undefined && g.node(() => schemeNode(m, r.scheme!), `s${r.scheme}`)) g.edge({ key: `s${r.path}-${r.scheme}`, from: me, to: `s${r.scheme}`, kind: "scheme", label, mult, id: r.property });
+    for (const n of r.node ?? []) {
+      if (n === sid) continue;
+      if (m.shape(n) && g.node(() => shapeNode(m, n), `h${n}`)) g.edge({ key: `n${r.path}-${n}`, from: me, to: `h${n}`, kind: r.composite ? "comp" : "assoc", label, mult, id: r.property });
+    }
+  }
+  for (const u of si.usedBy ?? []) {
+    if (u !== sid && m.shape(u) && g.node(() => shapeNode(m, u), `h${u}`)) g.edge({ key: `u${u}`, from: `h${u}`, to: me, kind: "incoming" });
+  }
+  return g.done();
 }
 
 export interface OverviewOptions {

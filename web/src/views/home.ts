@@ -16,7 +16,7 @@ export function homePage(ctx: AppCtx): HTMLElement {
   if (desc) {
     const lead = h("p", { class: "lead clamp" }, desc);
     page.appendChild(lead);
-    if (desc.length > 320) page.appendChild(h("button", { class: "linkish", type: "button", onClick: (ev: Event) => {
+    if (desc.length > 320) page.appendChild(h("button", { class: "linkish small", type: "button", onClick: (ev: Event) => {
       lead.classList.toggle("clamp");
       (ev.target as HTMLElement).textContent = lead.classList.contains("clamp") ? "Read more" : "Show less";
     } }, "Read more"));

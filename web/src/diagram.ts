@@ -84,8 +84,16 @@ export interface DiagramCallbacks {
   onToggleAttrs?: (id: number) => void;
   onMore?: (ids: number[], relation: string) => void;
   onStatus?: (text: string) => void;
+  /** Pan and zoom changed by the user (null: back to "fit"), for links to the view. */
+  onViewChange?: (view: View | null) => void;
   /** Actions offered when a box is clicked. Without them, a click opens the entity. */
   nodeMenu?: (id: number) => NodeAction[];
+}
+
+export interface View {
+  tx: number;
+  ty: number;
+  scale: number;
 }
 
 export interface NodeAction {
@@ -98,6 +106,8 @@ export interface RenderOptions {
   direction: "DOWN" | "RIGHT";
   /** Keep the current pan/zoom when re-rendering. */
   keepView?: boolean;
+  /** Start from this pan and zoom instead of fitting the diagram. */
+  view?: View;
   /** Use ELK's stress layout (for maps) instead of layered. */
   algorithm?: "layered" | "stress";
 }
@@ -196,8 +206,11 @@ export class Diagram {
     }
     if (my !== this.seq) return;
     this.draw(spec, laid, sizes);
-    if (!opts.keepView) this.fit();
-    else this.applyTransform();
+    if (opts.view) {
+      ({ tx: this.tx, ty: this.ty, scale: this.scale } = opts.view);
+      this.applyTransform(false);
+    } else if (!opts.keepView) this.fit();
+    else this.applyTransform(false);
   }
 
   private draw(spec: GraphSpec, laid: ElkNode, sizes: Map<string, Sized>): void {
@@ -339,7 +352,7 @@ export class Diagram {
         g.appendChild(more);
       }
     }
-    g.appendChild(s("title", null, `${n.name}${n.stereotype ? " " + n.stereotype : ""}\n${this.cb.nodeMenu ? "click: options" : "click: open"} · double-click: expand neighbours`));
+    g.appendChild(s("title", null, `${n.name}${n.stereotype ? " " + n.stereotype : ""}\n${this.cb.nodeMenu ? "click: options" : "click: open"}${this.cb.onExpand ? " · double-click: expand neighbours" : ""}`));
     if (n.kind === "more" && n.moreOf) {
       g.addEventListener("click", () => this.cb.onMore?.(n.moreOf!.ids, n.moreOf!.relation));
     } else if (n.id !== undefined) {
@@ -445,8 +458,15 @@ export class Diagram {
 
   // ---- pan & zoom ---------------------------------------------------------
 
-  private applyTransform(): void {
+  private viewTimer: ReturnType<typeof setTimeout> | undefined;
+
+  /** `byUser`: a pan or zoom worth remembering in the link to this view. */
+  private applyTransform(byUser = true): void {
     this.viewport.setAttribute("transform", `translate(${this.tx} ${this.ty}) scale(${this.scale})`);
+    if (byUser && this.cb.onViewChange) {
+      clearTimeout(this.viewTimer);
+      this.viewTimer = setTimeout(() => this.cb.onViewChange?.({ tx: this.tx, ty: this.ty, scale: this.scale }), 400);
+    }
   }
 
   fit(): void {
@@ -460,7 +480,9 @@ export class Diagram {
     this.scale = Math.min(1.1, Math.max(0.15, Math.min(sx, sy)));
     this.tx = (box.width - this.content.w * this.scale) / 2;
     this.ty = top + Math.max(0, (box.height - top - bottom - this.content.h * this.scale) / 2);
-    this.applyTransform();
+    this.applyTransform(false);
+    clearTimeout(this.viewTimer);
+    this.cb.onViewChange?.(null);
   }
 
   zoomBy(f: number): void {

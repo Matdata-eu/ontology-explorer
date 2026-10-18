@@ -18,6 +18,8 @@ pub struct Options {
     pub generator: String,
     /// At most this many individuals (instances) are kept per class.
     pub max_individuals_per_class: usize,
+    /// Keep the Turtle of every entity for its "RDF" section.
+    pub rdf: bool,
 }
 
 /// Build a bundle from loaded inputs.
@@ -2402,6 +2404,16 @@ impl<'a> Builder<'a> {
                     .unwrap_or_else(|| e.iri.clone())
             })
         });
+        let rdf: BTreeMap<Id, String> = if opts.rdf {
+            self.entities
+                .iter()
+                .filter_map(|e| {
+                    crate::turtle::describe(self.g, &self.prefixes, nn(&e.iri)).map(|t| (e.id, t))
+                })
+                .collect()
+        } else {
+            BTreeMap::new()
+        };
         let count = |k: Kind| self.entities.iter().filter(|e| e.kind == k).count();
         let property_shapes = self
             .shapes
@@ -2452,6 +2464,7 @@ impl<'a> Builder<'a> {
             individuals: self.individuals,
             ontologies: self.ontologies,
             root_classes,
+            rdf,
             suggested,
         }
     }

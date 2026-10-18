@@ -2,7 +2,9 @@
 import type { AppCtx } from "../ctx";
 import { h, icon, plural } from "../dom";
 import { KIND_LABEL, type Entity, type Id, type PropRow } from "../model";
-import { annotations, chip, chips, constraintLine, link, pageHead, propTable, section } from "./common";
+import { buildPropertyGraph, buildShapeGraph } from "../graph";
+import { entityDiagram } from "./diagramPanel";
+import { pageTail, chip, chips, constraintLine, link, pageHead, propTable, section } from "./common";
 
 export function propertyPage(ctx: AppCtx, e: Entity): HTMLElement {
   const m = ctx.m;
@@ -23,6 +25,10 @@ export function propertyPage(ctx: AppCtx, e: Entity): HTMLElement {
   if ((pi.inverseOf ?? []).length) dl.append(h("dt", null, "Inverse of"), h("dd", null, chips(ctx, pi.inverseOf!)));
   if ((pi.equivalent ?? []).length) dl.append(h("dt", null, "Equivalent to"), h("dd", null, chips(ctx, pi.equivalent!)));
   page.appendChild(h("div", { class: "card" }, dl));
+  if (buildPropertyGraph(m, e.id).edges.length || (pi.usedByClasses ?? []).length) {
+    page.appendChild(section("Diagram"));
+    page.appendChild(entityDiagram(ctx, e.id, () => buildPropertyGraph(m, e.id), "the property between the classes and shapes that use it and what it points at"));
+  }
 
   // Where it is used: one row per class, with the constraints that class puts on it.
   const used = pi.usedByClasses ?? [];
@@ -56,8 +62,7 @@ export function propertyPage(ctx: AppCtx, e: Entity): HTMLElement {
     page.appendChild(section("In shapes", { count: pi.usedByShapes!.length }));
     page.appendChild(chips(ctx, pi.usedByShapes!));
   }
-  const ann = annotations(ctx, e);
-  if (ann) page.appendChild(ann);
+  pageTail(ctx, e, page);
   return page;
 }
 
@@ -87,8 +92,7 @@ export function schemePage(ctx: AppCtx, e: Entity): HTMLElement {
   page.appendChild(section("Concepts", { count: (si.concepts ?? []).length, tools: [filter] }));
   page.appendChild(treeHost);
   renderTree();
-  const ann = annotations(ctx, e);
-  if (ann) page.appendChild(ann);
+  pageTail(ctx, e, page);
   return page;
 }
 
@@ -168,8 +172,7 @@ export function conceptPage(ctx: AppCtx, e: Entity): HTMLElement {
     page.appendChild(section("A value for", { count: usedBy.size }));
     page.appendChild(chips(ctx, [...usedBy]));
   }
-  const ann = annotations(ctx, e);
-  if (ann) page.appendChild(ann);
+  pageTail(ctx, e, page);
   return page;
 }
 
@@ -194,6 +197,8 @@ export function shapePage(ctx: AppCtx, e: Entity): HTMLElement {
   if ((si.messages ?? []).length) dl.append(h("dt", null, "Message"), h("dd", null, si.messages!.map((x) => h("div", { class: "muted" }, x))));
   if (dl.childElementCount === 0) dl.append(h("dt", null, "Targets"), h("dd", { class: "faint" }, "none declared; used through sh:node from other shapes"));
   page.appendChild(h("div", { class: "card" }, dl));
+  page.appendChild(section("Diagram"));
+  page.appendChild(entityDiagram(ctx, e.id, (open) => buildShapeGraph(m, e.id, { open, hidden: true }), "literal property shapes in the box, the rest as arrows; dotted: targets and references"));
   const cons = si.constraints ?? [];
   if (cons.length) {
     page.appendChild(section("Node constraints", { count: cons.length }));
@@ -202,8 +207,7 @@ export function shapePage(ctx: AppCtx, e: Entity): HTMLElement {
   const props = si.properties ?? [];
   page.appendChild(section("Property shapes", { count: props.length }));
   page.appendChild(propTable(ctx, props, { showInherited: true, showHidden: true, showSource: false, forShape: true }));
-  const ann = annotations(ctx, e);
-  if (ann) page.appendChild(ann);
+  pageTail(ctx, e, page);
   return page;
 }
 
@@ -242,7 +246,6 @@ export function genericPage(ctx: AppCtx, e: Entity): HTMLElement {
     dl.append(h("dt", null, "Kind"), h("dd", null, "SHACL property shape"));
   }
   if (dl.childElementCount) page.appendChild(h("div", { class: "card" }, dl));
-  const ann = annotations(ctx, e);
-  if (ann) page.appendChild(ann);
+  pageTail(ctx, e, page);
   return page;
 }

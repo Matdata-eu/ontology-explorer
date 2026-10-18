@@ -150,8 +150,9 @@ code,
   gap: 8px;
   padding: 0 16px;
   background: var(--oe-panel);
-  box-shadow: 0 1px 0 var(--oe-border);
+  border-bottom: 3px solid var(--oe-highlight);
   min-height: 64px;
+  min-width: 0;
   position: relative;
   z-index: 2;
 }
@@ -213,7 +214,29 @@ code,
   padding: 18px 22px 40px;
   max-width: 1200px;
 }
+.topbar > .btn,
+.topbar > select {
+  flex-shrink: 0;
+}
+.btn.menu-btn {
+  display: none;
+}
 @media (max-width: 860px) {
+  .btn.menu-btn {
+    display: inline-flex;
+  }
+  /* Room for the title on a phone: the share button keeps its icon, About moves to the footer. */
+  .topbar .share-btn span,
+  .topbar .btn.about-btn {
+    display: none;
+  }
+  .topbar .btn.share-btn {
+    padding: 0;
+    width: 32px;
+  }
+  .topbar select.btn.select {
+    max-width: 64px;
+  }
   .body {
     grid-template-columns: 1fr;
   }
@@ -1205,49 +1228,6 @@ details.sparql pre {
   color: var(--oe-text-2);
   font-size: 14px;
 }
-.dropzone {
-  border: 2px dashed var(--oe-border-strong);
-  border-radius: var(--oe-radius-lg);
-  padding: 32px;
-  text-align: center;
-  color: var(--oe-text-2);
-  background: var(--oe-panel);
-  transition: border-color var(--oe-ease), background-color var(--oe-ease);
-}
-.dropzone.over {
-  border-color: var(--oe-accent);
-  background: var(--oe-accent-bg);
-}
-.dropzone h2 {
-  margin: 0 0 8px;
-  font-size: 20px;
-  line-height: 28px;
-  font-weight: 600;
-  color: var(--oe-text);
-}
-.dropzone .actions {
-  display: flex;
-  gap: 8px;
-  justify-content: center;
-  flex-wrap: wrap;
-  margin-top: 12px;
-}
-.dropzone form {
-  display: flex;
-  gap: 6px;
-  justify-content: center;
-  margin-top: 10px;
-  flex-wrap: wrap;
-}
-.dropzone form .input {
-  max-width: 420px;
-}
-.examples {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: center;
-}
 .progress {
   padding: 40px 20px;
   text-align: center;
@@ -1299,35 +1279,6 @@ details.sparql pre {
   font-size: 14px;
   z-index: 30;
   box-shadow: var(--oe-shadow-raised);
-}
-
-/* dialog */
-dialog.about {
-  border: 0;
-  border-radius: var(--oe-radius-lg);
-  background: var(--oe-panel);
-  color: var(--oe-text);
-  padding: 24px 32px;
-  max-width: 520px;
-  box-shadow: var(--oe-shadow-raised);
-  font-family: var(--oe-font);
-}
-dialog.about::backdrop {
-  background: rgba(13, 20, 28, 0.45);
-}
-dialog.about h2 {
-  margin: 0 0 8px;
-  font-size: 20px;
-  line-height: 28px;
-  font-weight: 600;
-}
-dialog.about p {
-  margin: 6px 0;
-}
-dialog.about .row {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 12px;
 }
 
 /* concept tree in scheme pages */
@@ -1404,7 +1355,6 @@ button.linkish {
   color: var(--oe-accent);
   cursor: pointer;
   font: inherit;
-  font-size: 13px;
 }
 .cons .ck {
   display: inline-block;
@@ -1444,4 +1394,282 @@ button.linkish {
 .diagram .menu button:focus-visible {
   outline: 2px solid var(--oe-focus);
   outline-offset: -2px;
+}
+
+/* the language list in the top bar matches the buttons next to it */
+select.btn.select {
+  appearance: none;
+  padding: 0 28px 0 10px;
+  background: var(--oe-panel) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2380889c' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 9px center;
+  max-width: 96px;
+}
+
+/* long texts keep the line breaks they were written with */
+.lead,
+.kv dd,
+.ptable .desc,
+.ptable .msg,
+.ann dd {
+  white-space: pre-line;
+}
+
+/* ---- dialogs (about, help) ----------------------------------------- */
+dialog.oe-dialog {
+  width: min(600px, calc(100vw - 32px));
+  max-height: min(84vh, 760px);
+  padding: 0;
+  border: 0;
+  border-radius: var(--oe-radius-lg);
+  background: var(--oe-panel);
+  color: var(--oe-text);
+  box-shadow: var(--oe-shadow-raised);
+  font-family: var(--oe-font);
+}
+dialog.oe-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+dialog.oe-dialog::backdrop {
+  background: rgba(13, 20, 28, 0.45);
+}
+.oe-dialog .dlg-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 16px 8px 24px;
+}
+.oe-dialog .dlg-head h2 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 600;
+}
+.oe-dialog .dlg-body {
+  padding: 0 24px 24px;
+  overflow: auto;
+}
+.oe-dialog .dlg-body h3 {
+  margin: 20px 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.oe-dialog p {
+  margin: 8px 0;
+}
+.oe-dialog .credits {
+  margin: 4px 0;
+  padding-left: 18px;
+}
+.oe-dialog .credits li {
+  margin: 4px 0;
+}
+.small {
+  font-size: 13px;
+}
+.help-sec {
+  border-top: 1px solid var(--oe-border);
+}
+.help-sec:last-child {
+  border-bottom: 1px solid var(--oe-border);
+}
+.help-sec summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 12px 0;
+}
+.help-sec ul {
+  margin: 0 0 12px;
+  padding-left: 18px;
+}
+.help-sec li {
+  margin: 6px 0;
+}
+kbd {
+  font: 12px var(--oe-mono);
+  padding: 1px 5px;
+  border: 1px solid var(--oe-border-strong);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--oe-panel-2);
+}
+
+/* ---- the open page --------------------------------------------------- */
+.open-page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 16px 0 8px;
+}
+.open-hero {
+  margin: 24px 0 32px;
+}
+.open-hero h1 {
+  margin: 0 0 8px;
+  font-size: 40px;
+  line-height: 48px;
+  font-weight: 600;
+}
+.open-hero .lead {
+  max-width: 62ch;
+  color: var(--oe-text-2);
+  margin: 0;
+}
+.open-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+}
+.open-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 24px;
+}
+.open-card h2,
+.open-page > .examples h2 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 600;
+}
+.open-card p {
+  margin: 0;
+}
+.dropzone {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 150px;
+  padding: 24px;
+  text-align: center;
+  border: 1.5px dashed var(--oe-border-strong);
+  border-radius: var(--oe-radius);
+  background: var(--oe-panel-2);
+  color: var(--oe-text-2);
+  cursor: pointer;
+  transition: border-color var(--oe-ease), background-color var(--oe-ease);
+}
+.dropzone:hover,
+.dropzone.over {
+  border-color: var(--oe-accent);
+  background: var(--oe-accent-bg);
+}
+.dropzone p {
+  margin: 0;
+}
+.dropzone strong {
+  color: var(--oe-text);
+}
+.dropzone .drop-icon {
+  width: 28px;
+  height: 28px;
+  color: var(--oe-accent);
+  margin-bottom: 4px;
+}
+.dropzone button.linkish {
+  font-size: inherit;
+}
+.url-form {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.url-form .input {
+  flex: 1;
+  min-width: 0;
+}
+.open-page > .examples {
+  margin-top: 48px;
+}
+.example-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+button.example {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 16px 20px;
+  border: 0;
+  border-radius: var(--oe-radius-lg);
+  background: var(--oe-panel);
+  box-shadow: var(--oe-shadow);
+  color: var(--oe-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: box-shadow var(--oe-ease);
+}
+button.example:hover {
+  box-shadow: var(--oe-shadow-raised);
+}
+button.example strong {
+  font-size: 16px;
+  font-weight: 600;
+}
+button.example .muted {
+  font-size: 14px;
+  line-height: 22px;
+}
+
+/* ---- full screen diagrams --------------------------------------------- */
+.diagram:fullscreen {
+  height: 100vh;
+  border-radius: 0;
+  resize: none;
+}
+.diagram.fs {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  height: auto;
+  border-radius: 0;
+  resize: none;
+}
+
+/* ---- RDF of an entity ------------------------------------------------ */
+.rdf {
+  margin-top: 8px;
+}
+pre.turtle {
+  margin: 0;
+  max-height: 480px;
+  overflow: auto;
+  padding: 16px 20px;
+  border-radius: var(--oe-radius);
+  background: var(--oe-panel-2);
+  border: 1px solid var(--oe-border);
+  font: 12.5px/1.6 var(--oe-mono);
+  white-space: pre;
+  tab-size: 4;
+}
+pre.turtle .t-str {
+  color: var(--oe-shape);
+  white-space: pre-wrap;
+}
+pre.turtle .t-com {
+  color: var(--oe-text-3);
+  font-style: italic;
+}
+pre.turtle .t-kw {
+  color: var(--oe-text-3);
+}
+pre.turtle .t-iri {
+  color: var(--oe-text);
+}
+pre.turtle a.t-iri {
+  color: var(--oe-accent);
+  text-decoration: none;
+}
+pre.turtle a.t-iri:hover {
+  text-decoration: underline;
+}
+.diagram.small-diagram {
+  height: 440px;
 }

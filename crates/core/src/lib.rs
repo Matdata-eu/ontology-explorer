@@ -9,6 +9,7 @@ pub mod bundle;
 pub mod input;
 pub mod model;
 pub mod prefixes;
+pub mod turtle;
 pub mod vocab;
 
 pub use bundle::Bundle;

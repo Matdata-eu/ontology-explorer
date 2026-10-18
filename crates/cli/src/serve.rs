@@ -77,6 +77,7 @@ async fn async_run(args: ServeArgs) -> Result<()> {
             inputs: args.inputs.clone(),
             title: args.title.clone(),
             max_individuals: args.max_individuals,
+            no_rdf: false,
         };
         let sources = inputs::read_all(&input.inputs)?;
         let bundle = build_bundle(&sources, &crate::options(&input))?;
@@ -198,6 +199,7 @@ async fn build(State(s): State<AppState>, Query(q): Query<BuildQuery>, body: Byt
         title: q.title.clone().or(s.title.clone()),
         generator: format!("ontology-explorer {}", env!("CARGO_PKG_VERSION")),
         max_individuals_per_class: s.max_individuals,
+        rdf: true,
     };
     let result = tokio::task::spawn_blocking(move || {
         build_bundle(&sources, &opts).and_then(|b| Ok(serde_json::to_string(&b)?))

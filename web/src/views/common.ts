@@ -253,3 +253,45 @@ function pathWithLinks(ctx: AppCtx, r: PropRow): Child[] {
 export function emptyNote(text: string): HTMLElement {
   return h("p", { class: "muted" }, text);
 }
+
+const TOKEN = /("""[\s\S]*?"""|"(?:[^"\\\n]|\\.)*")|(<[^>\s]*>)|(#[^\n]*)|(@prefix\b|\ba\b(?= )|[A-Za-z][\w.-]*:(?:[\w-]+(?:[.\w-]*[\w-])?)?)/g;
+
+/** The entity's triples as Turtle, with the names in it linked to their pages. */
+export function rdfSection(ctx: AppCtx, e: Entity): HTMLElement | null {
+  const body = ctx.m.b.rdf?.[e.id];
+  if (!body) return null;
+  // The bundle keeps the prefixes once; declare the ones this snippet uses.
+  const used = new Set<string>();
+  for (const t of body.matchAll(TOKEN)) if (t[4] && t[4].includes(":")) used.add(t[4].slice(0, t[4].indexOf(":")));
+  const decl = [...used].sort().filter((p) => ctx.m.b.prefixes[p] !== undefined).map((p) => `@prefix ${p}: <${ctx.m.b.prefixes[p]}> .\n`);
+  const text = decl.length ? `${decl.join("")}\n${body}` : body;
+  const pre = h("pre", { class: "turtle" });
+  let at = 0;
+  for (const t of text.matchAll(TOKEN)) {
+    if (t.index > at) pre.append(text.slice(at, t.index));
+    at = t.index + t[0].length;
+    const [tok, str, iriRef, comment] = t;
+    if (str) pre.append(h("span", { class: "t-str" }, tok));
+    else if (comment) pre.append(h("span", { class: "t-com" }, tok));
+    else if (tok === "@prefix" || tok === "a") pre.append(h("span", { class: "t-kw" }, tok));
+    else {
+      const colon = tok.indexOf(":");
+      const iri = iriRef ? tok.slice(1, -1) : (ctx.m.b.prefixes[tok.slice(0, colon)] ?? "") + tok.slice(colon + 1);
+      const id = !iriRef && colon === tok.length - 1 ? undefined : ctx.m.id(iri);
+      if (id !== undefined && id !== e.id) pre.append(h("a", { href: ctx.href(id), class: "t-iri", title: iri, onClick: nav(ctx, id) }, tok));
+      else pre.append(h("span", { class: "t-iri", title: iri }, tok));
+    }
+  }
+  pre.append(text.slice(at));
+  const lines = text.split("\n").length - 1;
+  const copy = button("Copy", () => copyText(text).then((ok) => ctx.toast(ok ? "Turtle copied" : "Could not copy")), { icon: "copy", cls: "small" });
+  return h("div", { class: "rdf" }, section("RDF", { count: lines, tools: [h("span", { class: "faint small" }, "Turtle, as in the loaded files"), copy] }), pre);
+}
+
+/** Add the page's closing sections: other annotations, then the RDF. */
+export function pageTail(ctx: AppCtx, e: Entity, page: HTMLElement): void {
+  const ann = annotations(ctx, e);
+  if (ann) page.appendChild(ann);
+  const rdf = rdfSection(ctx, e);
+  if (rdf) page.appendChild(rdf);
+}
