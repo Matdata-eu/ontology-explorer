@@ -89,12 +89,28 @@ export function sidebar(ctx: AppCtx): Sidebar {
     return li;
   };
   const visible = (id: Id) => (showExternal || !m.isExternal(id)) && (showDeprecated || !m.entity(id).deprecated);
+  // A hidden (external or deprecated) class or property does not hide what is
+  // under it: its visible descendants move up to the nearest visible ancestor.
+  const throughHidden = (ids: Id[], next: (id: Id) => Id[], seen = new Set<Id>()): Id[] => {
+    const out: Id[] = [];
+    for (const id of ids) {
+      if (seen.has(id)) continue;
+      seen.add(id);
+      if (visible(id)) out.push(id);
+      else out.push(...throughHidden(next(id), next, seen));
+    }
+    return out;
+  };
+  const subClasses = (id: Id) => m.cls(id)?.subClasses ?? [];
+  const superClasses = (id: Id) => m.cls(id)?.superClasses ?? [];
+  const subProperties = (id: Id) => m.prop(id)?.subProperties ?? [];
+  const superProperties = (id: Id) => m.prop(id)?.superProperties ?? [];
   const childrenOf = (id: Id): Id[] => {
     const e = m.entity(id);
-    if (e.kind === "class") return (m.cls(id)?.subClasses ?? []).filter(visible);
+    if (e.kind === "class") return throughHidden(subClasses(id), subClasses);
     if (e.kind === "conceptScheme") return m.scheme(id)?.topConcepts ?? [];
     if (e.kind === "concept") return m.concept(id)?.narrower ?? [];
-    if (e.kind === "objectProperty" || e.kind === "datatypeProperty" || e.kind === "property" || e.kind === "annotationProperty") return (m.prop(id)?.subProperties ?? []).filter(visible);
+    if (e.kind === "objectProperty" || e.kind === "datatypeProperty" || e.kind === "property" || e.kind === "annotationProperty") return throughHidden(subProperties(id), subProperties);
     return [];
   };
   const toolbar = (...extra: Node[]) =>
@@ -121,7 +137,8 @@ export function sidebar(ctx: AppCtx): Sidebar {
     }
     if (tab === "classes") {
       tree.appendChild(toolbar());
-      const roots = m.b.rootClasses.filter(visible);
+      // Top level: visible classes with no visible super class, also those under a hidden root.
+      const roots = sorted(throughHidden(m.b.rootClasses, subClasses).filter((id) => throughHidden(superClasses(id), superClasses).length === 0));
       const ul = h("ul", { class: "tnode" }, roots.map((r) => rowEl(r, () => childrenOf(r))));
       tree.appendChild(ul);
       if (roots.length === 0) tree.appendChild(h("div", { class: "empty" }, "No classes to show."));
@@ -138,7 +155,7 @@ export function sidebar(ctx: AppCtx): Sidebar {
         if (ids.length === 0) continue;
         // Top level: properties without a super property in the list.
         const set = new Set(ids);
-        const top = sorted(ids.filter((id) => !(m.prop(id)?.superProperties ?? []).some((s) => set.has(s))));
+        const top = sorted(ids.filter((id) => !throughHidden(superProperties(id), superProperties).some((s) => set.has(s))));
         tree.appendChild(h("div", { class: "section" }, `${title} · ${ids.length}`));
         tree.appendChild(h("ul", { class: "tnode" }, top.map((id) => rowEl(id, () => childrenOf(id)))));
       }
@@ -206,7 +223,7 @@ export function sidebar(ctx: AppCtx): Sidebar {
       while (cur !== undefined && !seen.has(cur)) {
         seen.add(cur);
         chain.unshift(cur);
-        cur = (m.cls(cur)?.superClasses ?? [])[0];
+        cur = throughHidden(superClasses(cur), superClasses)[0];
       }
       let scope: ParentNode = tree;
       for (const c of chain) {
