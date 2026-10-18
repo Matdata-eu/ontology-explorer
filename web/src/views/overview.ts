@@ -2,6 +2,7 @@
 import type { AppCtx } from "../ctx";
 import { Diagram } from "../diagram";
 import { button, copyText, h } from "../dom";
+import { classActions } from "./diagramPanel";
 import { buildOverview, classNamespaces, toMermaid, toPlantUml, type GraphSpec, type OverviewOptions } from "../graph";
 
 export function overviewPage(ctx: AppCtx): HTMLElement {
@@ -15,7 +16,7 @@ export function overviewPage(ctx: AppCtx): HTMLElement {
   const statusText = h("span");
   status.append(statusText, h("div", { class: "legend hide-mobile" }, h("span", { class: "gen" }, "is a"), h("span", { class: "assoc" }, "has")));
   const overlay = h("div", { class: "overlay" }, "Laying out the whole model… (large ontologies take a few seconds)");
-  const d = new Diagram(wrap, { onNavigate: (id) => ctx.go(id), onExpand: (id) => ctx.go(id), onStatus: (t) => (statusText.textContent = t) });
+  const d = new Diagram(wrap, { onNavigate: (id) => ctx.go(id), onExpand: (id) => ctx.go(id), nodeMenu: (id) => classActions(ctx, id), onStatus: (t) => (statusText.textContent = t) });
   let graph: GraphSpec | null = null;
   const run = () => {
     wrap.appendChild(overlay);
@@ -58,7 +59,7 @@ export function overviewPage(ctx: AppCtx): HTMLElement {
   );
   wrap.append(tools, exportMenu, status);
   page.appendChild(wrap);
-  page.appendChild(h("p", { class: "faint", style: { fontSize: "12px", marginTop: "6px" } }, "Hierarchy only by default. Click a class to open it. Very large models show the most connected classes first."));
+  page.appendChild(h("p", { class: "faint", style: { fontSize: "12px", marginTop: "6px" } }, "Hierarchy only by default. Click a class to open its diagram or table. Very large models show the most connected classes first."));
   queueMicrotask(run);
   return page;
 }

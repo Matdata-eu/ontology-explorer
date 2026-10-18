@@ -1,6 +1,6 @@
 // Draws a GraphSpec as a UML-style SVG: ELK for layout, hand-made rendering,
 // pan and zoom, highlighting, SVG and PNG export.
-import { clear, downloadBlob, s } from "./dom";
+import { clear, downloadBlob, icon, s } from "./dom";
 import type { AttrLine, EdgeSpec, GraphSpec, NodeSpec } from "./graph";
 import { layout, type ElkNode } from "./layout";
 
@@ -84,6 +84,14 @@ export interface DiagramCallbacks {
   onToggleAttrs?: (id: number) => void;
   onMore?: (ids: number[], relation: string) => void;
   onStatus?: (text: string) => void;
+  /** Actions offered when a box is clicked. Without them, a click opens the entity. */
+  nodeMenu?: (id: number) => NodeAction[];
+}
+
+export interface NodeAction {
+  label: string;
+  icon?: string;
+  run: () => void;
 }
 
 export interface RenderOptions {
@@ -138,6 +146,7 @@ export class Diagram {
   async render(spec: GraphSpec, opts: RenderOptions): Promise<void> {
     const my = ++this.seq;
     this.spec = spec;
+    this.closeMenu();
     // Boxes are sized by measuring text, so wait for the web fonts.
     await document.fonts?.ready;
     if (my !== this.seq) return;
@@ -330,7 +339,7 @@ export class Diagram {
         g.appendChild(more);
       }
     }
-    g.appendChild(s("title", null, `${n.name}${n.stereotype ? " " + n.stereotype : ""}\nclick: open · double-click: expand neighbours`));
+    g.appendChild(s("title", null, `${n.name}${n.stereotype ? " " + n.stereotype : ""}\n${this.cb.nodeMenu ? "click: options" : "click: open"} · double-click: expand neighbours`));
     if (n.kind === "more" && n.moreOf) {
       g.addEventListener("click", () => this.cb.onMore?.(n.moreOf!.ids, n.moreOf!.relation));
     } else if (n.id !== undefined) {
@@ -338,7 +347,12 @@ export class Diagram {
       g.addEventListener("click", (ev) => {
         ev.stopPropagation();
         if (clickTimer) clearTimeout(clickTimer);
-        clickTimer = setTimeout(() => this.cb.onNavigate?.(n.id as number), 220);
+        const { clientX, clientY } = ev;
+        clickTimer = setTimeout(() => {
+          const actions = this.cb.nodeMenu?.(n.id as number);
+          if (actions?.length) this.showMenu(n.name, actions, clientX, clientY);
+          else this.cb.onNavigate?.(n.id as number);
+        }, 220);
       });
       g.addEventListener("dblclick", (ev) => {
         ev.stopPropagation();
@@ -349,6 +363,64 @@ export class Diagram {
     g.addEventListener("pointerenter", () => this.highlight(n.key));
     g.addEventListener("pointerleave", () => this.highlight(null));
     return g;
+  }
+
+  private menu: HTMLElement | null = null;
+
+  /** The small menu a click on a box opens, at the click position. */
+  private showMenu(title: string, actions: NodeAction[], x: number, y: number): void {
+    this.closeMenu();
+    const menu = document.createElement("div");
+    menu.className = "menu node-menu";
+    menu.setAttribute("role", "menu");
+    const head = document.createElement("div");
+    head.className = "mh";
+    head.textContent = title;
+    menu.appendChild(head);
+    for (const a of actions) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.setAttribute("role", "menuitem");
+      if (a.icon) b.appendChild(icon(a.icon));
+      b.append(a.label);
+      b.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        this.closeMenu();
+        a.run();
+      });
+      menu.appendChild(b);
+    }
+    this.host.appendChild(menu);
+    const box = this.host.getBoundingClientRect();
+    const left = Math.max(4, Math.min(x - box.left + 4, box.width - menu.offsetWidth - 4));
+    const top = Math.max(4, Math.min(y - box.top + 4, box.height - menu.offsetHeight - 4));
+    menu.style.left = `${left}px`;
+    menu.style.top = `${top}px`;
+    this.menu = menu;
+    (menu.querySelector("button") as HTMLButtonElement | null)?.focus();
+    const away = (ev: Event) => {
+      if (ev instanceof KeyboardEvent && ev.key !== "Escape") return;
+      if (ev.type === "pointerdown" && ev.composedPath().includes(menu)) return;
+      this.closeMenu();
+    };
+    const root = this.host.getRootNode() as Document | ShadowRoot;
+    root.addEventListener("pointerdown", away, true);
+    root.addEventListener("keydown", away, true);
+    this.svg.addEventListener("wheel", away, { passive: true });
+    this.unbindMenu = () => {
+      root.removeEventListener("pointerdown", away, true);
+      root.removeEventListener("keydown", away, true);
+      this.svg.removeEventListener("wheel", away);
+    };
+  }
+
+  private unbindMenu: (() => void) | null = null;
+
+  closeMenu(): void {
+    this.unbindMenu?.();
+    this.unbindMenu = null;
+    this.menu?.remove();
+    this.menu = null;
   }
 
   private highlight(key: string | null): void {
@@ -418,7 +490,6 @@ export class Diagram {
         return;
       }
       dragging = { x: ev.clientX, y: ev.clientY, tx: this.tx, ty: this.ty, moved: false };
-      this.svg.setPointerCapture(ev.pointerId);
     });
     this.svg.addEventListener("pointermove", (ev) => {
       if (pointers.has(ev.pointerId)) pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
@@ -433,7 +504,13 @@ export class Diagram {
       if (!dragging) return;
       const dx = ev.clientX - dragging.x;
       const dy = ev.clientY - dragging.y;
-      if (Math.abs(dx) + Math.abs(dy) > 3) dragging.moved = true;
+      if (!dragging.moved && Math.abs(dx) + Math.abs(dy) > 3) {
+        dragging.moved = true;
+        // Capture only once it is a drag: capturing on pointerdown sends the
+        // click to the canvas instead of the box under the pointer.
+        this.svg.setPointerCapture(ev.pointerId);
+      }
+      if (!dragging.moved) return;
       this.tx = dragging.tx + dx;
       this.ty = dragging.ty + dy;
       this.applyTransform();

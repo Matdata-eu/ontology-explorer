@@ -1418,3 +1418,30 @@ button.linkish {
   max-height: 260px;
   overflow: auto;
 }
+
+/* the menu a click on a diagram box opens */
+.diagram .node-menu {
+  min-width: 220px;
+  max-width: 320px;
+}
+.diagram .node-menu .mh {
+  font-weight: 600;
+  color: var(--oe-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.diagram .node-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.diagram .node-menu button .icon {
+  width: 16px;
+  height: 16px;
+  color: var(--oe-text-2);
+}
+.diagram .menu button:focus-visible {
+  outline: 2px solid var(--oe-focus);
+  outline-offset: -2px;
+}

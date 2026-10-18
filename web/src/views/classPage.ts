@@ -38,7 +38,7 @@ export function classPage(ctx: AppCtx, e: Entity): HTMLElement {
   page.appendChild(section(tab === "diagram" ? "Diagram" : "Properties", { count: tab === "diagram" ? undefined : own, tools: [tabs] }));
   if (tab === "diagram") {
     page.appendChild(diagramPanel(ctx, e.id).el);
-    page.appendChild(h("p", { class: "faint", style: { fontSize: "12px", marginTop: "6px" } }, "Click a box to open it, double-click to add its neighbours, drag to pan, scroll to zoom. Dashed arrows point at value sets (SKOS concept schemes); dotted arrows come from other classes."));
+    page.appendChild(h("p", { class: "faint", style: { fontSize: "12px", marginTop: "6px" } }, "Click a box to add its neighbours or open its own diagram (double-click adds them straight away), drag to pan, scroll to zoom. Dashed arrows point at value sets (SKOS concept schemes); dotted arrows come from other classes."));
   }
 
   // Property table (always below the diagram, since the diagram only shows literals inside boxes).

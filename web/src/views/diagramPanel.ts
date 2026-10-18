@@ -1,6 +1,6 @@
 // The diagram with its toolbar: options, zoom, export.
 import type { AppCtx } from "../ctx";
-import { Diagram } from "../diagram";
+import { Diagram, type NodeAction } from "../diagram";
 import { button, copyText, h, icon } from "../dom";
 import { buildNeighborhood, defaultNeighborhood, toMermaid, toPlantUml, type GraphSpec, type NeighborhoodOptions } from "../graph";
 import type { Id } from "../model";
@@ -8,6 +8,18 @@ import type { Id } from "../model";
 export interface DiagramPanel {
   el: HTMLElement;
   rerender(): void;
+}
+
+/** What a click on a box in a diagram offers: grow the diagram there, or go to it. */
+export function classActions(ctx: AppCtx, id: Id, expand?: { expanded: boolean; toggle: () => void }): NodeAction[] {
+  const actions: NodeAction[] = [];
+  const isClass = ctx.m.entity(id).kind === "class";
+  if (expand) actions.push({ label: expand.expanded ? "Remove its neighbours" : "Add its neighbours to this diagram", icon: expand.expanded ? "minus" : "plus", run: expand.toggle });
+  if (isClass) {
+    actions.push({ label: "Open its diagram", icon: "diagram", run: () => ctx.go(id, { tab: "diagram" }) });
+    actions.push({ label: "Open its property table", icon: "table", run: () => ctx.go(id, { tab: "table" }) });
+  } else actions.push({ label: "Open its page", icon: "external", run: () => ctx.go(id) });
+  return actions;
 }
 
 export function diagramPanel(ctx: AppCtx, focus: Id, opts: { tall?: boolean } = {}): DiagramPanel {
@@ -27,13 +39,15 @@ export function diagramPanel(ctx: AppCtx, focus: Id, opts: { tall?: boolean } = 
   const statusText = h("span");
   status.append(statusText, h("div", { class: "legend hide-mobile" }, h("span", { class: "gen" }, "is a"), h("span", { class: "assoc" }, "has"), h("span", { class: "comp" }, "contains")));
   let overlay: HTMLElement | null = h("div", { class: "overlay" }, "Laying out…");
+  const expand = (id: Id) => {
+    if (o.expanded.has(id)) o.expanded.delete(id);
+    else o.expanded.add(id);
+    run(true);
+  };
   const d = new Diagram(wrap, {
     onNavigate: (id) => ctx.go(id),
-    onExpand: (id) => {
-      if (o.expanded.has(id)) o.expanded.delete(id);
-      else o.expanded.add(id);
-      run(true);
-    },
+    onExpand: expand,
+    nodeMenu: (id) => classActions(ctx, id, id === focus ? undefined : { expanded: o.expanded.has(id), toggle: () => expand(id) }),
     onToggleAttrs: (id) => {
       if (o.openAttrs.has(id)) o.openAttrs.delete(id);
       else o.openAttrs.add(id);
