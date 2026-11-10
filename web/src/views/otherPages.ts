@@ -1,10 +1,11 @@
 // Detail pages for properties, schemes, concepts, shapes and everything else.
 import type { AppCtx } from "../ctx";
-import { h, icon, plural } from "../dom";
+import { h, plural } from "../dom";
 import { KIND_LABEL, type Entity, type Id, type PropRow } from "../model";
 import { buildPropertyGraph, buildShapeGraph } from "../graph";
 import { entityDiagram } from "./diagramPanel";
 import { pageTail, chip, chips, constraintLine, link, pageHead, propTable, section } from "./common";
+import { conceptTable } from "./conceptTable";
 
 export function propertyPage(ctx: AppCtx, e: Entity): HTMLElement {
   const m = ctx.m;
@@ -74,63 +75,12 @@ export function schemePage(ctx: AppCtx, e: Entity): HTMLElement {
   if ((si.usedBy ?? []).length) {
     page.appendChild(h("div", { class: "card" }, h("dl", { class: "kv" }, h("dt", null, "Values for"), h("dd", null, chips(ctx, si.usedBy!, { max: 30 })))));
   }
-  const filter = h("input", { class: "input", type: "search", placeholder: "Filter concepts…", style: { maxWidth: "280px" } }) as HTMLInputElement;
-  const treeHost = h("div", { class: "ctree" });
-  const renderTree = () => {
-    treeHost.replaceChildren();
-    const q = filter.value.trim();
-    if (q) {
-      const hits = m.search(q, { kinds: new Set(["concept"]), scheme: e.id, limit: 200 });
-      if (hits.length === 0) treeHost.appendChild(h("p", { class: "muted" }, "No concept matches."));
-      else treeHost.appendChild(h("ul", null, hits.map((id) => h("li", null, conceptRow(ctx, id, false)))));
-      return;
-    }
-    const top = si.topConcepts ?? [];
-    treeHost.appendChild(conceptList(ctx, top, 0));
-  };
-  filter.addEventListener("input", renderTree);
-  page.appendChild(section("Concepts", { count: (si.concepts ?? []).length, tools: [filter] }));
-  page.appendChild(treeHost);
-  renderTree();
+  const table = conceptTable(ctx, si);
+  page.appendChild(section("Concepts", { count: (si.concepts ?? []).length, tools: table.tools }));
+  page.appendChild(h("p", { class: "faint", style: { fontSize: "12px", marginTop: "-6px", marginBottom: "10px" } }, "Click a heading to sort, type under it to filter. Rows with a chevron open into their narrower concepts."));
+  page.appendChild(table);
   pageTail(ctx, e, page);
   return page;
-}
-
-function conceptList(ctx: AppCtx, ids: Id[], depth: number): HTMLElement {
-  const ul = h("ul");
-  const LIMIT = 300;
-  const render = (n: number) => {
-    ul.replaceChildren();
-    for (const id of ids.slice(0, n)) ul.appendChild(conceptItem(ctx, id, depth));
-    if (ids.length > n) ul.appendChild(h("li", null, h("button", { class: "chip more", type: "button", onClick: () => render(ids.length) }, `+${ids.length - n} more`)));
-  };
-  render(LIMIT);
-  return ul;
-}
-
-function conceptItem(ctx: AppCtx, id: Id, depth: number): HTMLElement {
-  const ci = ctx.m.concept(id);
-  const narrower = ci?.narrower ?? [];
-  const li = h("li");
-  let open = false;
-  let child: HTMLElement | null = null;
-  const tw = h("button", { class: `twisty${narrower.length ? "" : " leaf"}`, type: "button", "aria-label": "expand", onClick: () => {
-    open = !open;
-    tw.classList.toggle("open", open);
-    if (open && !child) {
-      child = conceptList(ctx, narrower, depth + 1);
-      li.appendChild(child);
-    } else if (child) child.hidden = !open;
-  } }, icon("chevron"));
-  li.appendChild(h("div", { class: "row" }, tw, conceptRow(ctx, id, true)));
-  if (depth === 0 && narrower.length && narrower.length <= 12) tw.click();
-  return li;
-}
-
-function conceptRow(ctx: AppCtx, id: Id, withCount: boolean): HTMLElement {
-  const ci = ctx.m.concept(id);
-  const e = ctx.m.entity(id);
-  return h("span", null, link(ctx, id), e.deprecated ? h("span", { class: "badge warn", style: { marginLeft: "6px" } }, "deprecated") : null, ci?.notation?.length ? h("span", { class: "notation" }, ci.notation.join(", ")) : null, withCount && (ci?.narrower ?? []).length ? h("span", { class: "count" }, `(${ci!.narrower!.length})`) : null);
 }
 
 export function conceptPage(ctx: AppCtx, e: Entity): HTMLElement {

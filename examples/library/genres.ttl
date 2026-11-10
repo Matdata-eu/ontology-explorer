@@ -9,24 +9,32 @@ gen:Genres a skos:ConceptScheme ;
 
 gen:fiction a skos:Concept ; skos:inScheme gen:Genres ; skos:topConceptOf gen:Genres ;
     skos:prefLabel "Fiction"@en , "Fictie"@nl ; skos:notation "F" ;
+    skos:definition "Works of imagination: invented people, places and events."@en ;
     skos:narrower gen:novel , gen:poetry , gen:crime .
 gen:novel a skos:Concept ; skos:inScheme gen:Genres ; skos:broader gen:fiction ;
-    skos:prefLabel "Novel"@en , "Roman"@nl ; skos:notation "F1" .
+    skos:prefLabel "Novel"@en , "Roman"@nl ; skos:notation "F1" ;
+    skos:definition "A long prose narrative."@en .
 gen:poetry a skos:Concept ; skos:inScheme gen:Genres ; skos:broader gen:fiction ;
-    skos:prefLabel "Poetry"@en , "Poëzie"@nl ; skos:notation "F2" .
+    skos:prefLabel "Poetry"@en , "Poëzie"@nl ; skos:notation "F2" ;
+    skos:definition "Verse: writing arranged in lines and often in metre."@en .
 gen:crime a skos:Concept ; skos:inScheme gen:Genres ; skos:broader gen:fiction ;
     skos:prefLabel "Crime"@en , "Misdaad"@nl ; skos:altLabel "Detective"@en ; skos:notation "F3" ;
+    skos:definition "Fiction about a crime and its investigation."@en ;
     skos:related gen:trueCrime .
 gen:nonFiction a skos:Concept ; skos:inScheme gen:Genres ; skos:topConceptOf gen:Genres ;
     skos:prefLabel "Non-fiction"@en , "Non-fictie"@nl ; skos:notation "N" ;
+    skos:definition "Works presented as factual."@en ;
     skos:narrower gen:history , gen:science , gen:trueCrime .
 gen:history a skos:Concept ; skos:inScheme gen:Genres ; skos:broader gen:nonFiction ;
-    skos:prefLabel "History"@en , "Geschiedenis"@nl ; skos:notation "N1" .
+    skos:prefLabel "History"@en , "Geschiedenis"@nl ; skos:notation "N1" ;
+    skos:definition "Accounts of past events."@en .
 gen:science a skos:Concept ; skos:inScheme gen:Genres ; skos:broader gen:nonFiction ;
     skos:prefLabel "Science"@en , "Wetenschap"@nl ; skos:notation "N2" ;
+    skos:definition "Works explaining the natural world and its study."@en ;
     skos:exactMatch <http://id.loc.gov/authorities/subjects/sh00007934> .
 gen:trueCrime a skos:Concept ; skos:inScheme gen:Genres ; skos:broader gen:nonFiction ;
-    skos:prefLabel "True crime"@en ; skos:notation "N3" .
+    skos:prefLabel "True crime"@en ; skos:notation "N3" ;
+    skos:definition "Factual accounts of real crimes."@en .
 
 cond:Conditions a skos:ConceptScheme ;
     skos:prefLabel "Copy conditions"@en , "Staat van exemplaren"@nl ;

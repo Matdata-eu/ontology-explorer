@@ -32,8 +32,9 @@ DCMI terms, ORG, GeoSPARQL 1.0, OWL-Time, QUDT, DASH or a small example library 
   show, or give the diagram the full screen. Properties and shapes have their own
   diagram. Export as SVG, PNG, PlantUML or Mermaid.
 - **Overview map** of every class, by namespace, with or without associations.
-- **SKOS vocabularies** as browsable trees with notations, broader/narrower,
-  mappings, and the properties that use them as value sets.
+- **SKOS vocabularies** as sortable, filterable concept tables (IRI, notation,
+  label, definition) whose rows open into narrower concepts, plus mappings and
+  the properties that use them as value sets.
 - **SHACL shapes** merged into the class tables, and a page per shape with its
   targets, property shapes, node constraints and SPARQL constraints.
 - **The RDF behind every page.** The triples about each class, property, concept
