@@ -99,7 +99,7 @@ export function openHelp(host: HTMLElement): void {
       "Properties, vocabularies and shapes",
       false,
       ["A ", b("property"), " page shows its domain and range, super and sub-properties, and every class and shape that uses it."],
-      ["A ", b("concept scheme"), " is a value set: its page shows the concepts as a tree with notations, and the properties that use it. A ", b("concept"), " page shows broader, narrower and related concepts and mappings."],
+      ["A ", b("concept scheme"), " is a value set: its page lists the concepts in a table (IRI, notation, label, definition) that you can sort and filter per column, with rows that open into their narrower concepts, and the properties that use it. A ", b("concept"), " page shows broader, narrower and related concepts and mappings."],
       ["A ", b("shape"), " page shows its targets, its property shapes with their constraints, node constraints and SPARQL constraints. Shapes are also merged into the class tables by path."],
       [b("RDF"), " on any page shows the triples about the entity, in Turtle, as they were in the files. Copy it with the button next to it."]
     ),

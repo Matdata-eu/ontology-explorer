@@ -1281,26 +1281,98 @@ details.sparql pre {
   box-shadow: var(--oe-shadow-raised);
 }
 
-/* concept tree in scheme pages */
-.ctree ul {
-  list-style: none;
-  padding-left: 18px;
-  margin: 0;
+/* concept table in scheme pages */
+.ctable-wrap .table-scroll {
+  overflow-x: auto;
+  border-radius: var(--oe-radius);
+  box-shadow: var(--oe-shadow);
 }
-.ctree > ul {
-  padding-left: 0;
+.ctable {
+  box-shadow: none;
+  min-width: 640px;
 }
-.ctree li {
-  margin: 2px 0;
+.ctable th {
+  padding: 0;
 }
-.ctree .row {
+.ctable th .sort {
   display: flex;
   align-items: center;
   gap: 4px;
+  width: 100%;
+  padding: 8px 12px;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
 }
-.ctree .twisty {
+.ctable th .sort:hover {
+  color: var(--oe-text);
+}
+.ctable th .sort .dir {
+  display: inline-flex;
+  width: 14px;
+  height: 14px;
+  color: var(--oe-text-3);
+  opacity: 0;
+  transition: transform 0.12s, opacity 0.12s;
+}
+.ctable th .sort .dir .icon {
+  width: 14px;
+  height: 14px;
+}
+.ctable th .sort:hover .dir {
+  opacity: 0.5;
+}
+.ctable th .sort.asc .dir,
+.ctable th .sort.desc .dir {
+  opacity: 1;
+  color: var(--oe-accent-strong);
+}
+.ctable th .sort.asc .dir {
+  transform: rotate(180deg);
+}
+.ctable tr.filters td {
+  padding: 4px 6px;
+  background: var(--oe-panel-2);
+}
+.ctable tr.filters .input {
+  min-height: 28px;
+  padding: 2px 8px;
+  font-size: 12.5px;
+}
+.ctable td.c-iri {
+  white-space: nowrap;
+}
+.ctable td.c-iri a {
+  font-size: 12.5px;
+}
+.ctable td.c-notation {
+  white-space: nowrap;
+  font-size: 12.5px;
+}
+.ctable td.c-label {
+  min-width: 160px;
+  font-weight: 500;
+}
+.ctable td.c-definition {
+  min-width: 240px;
+  color: var(--oe-text-2);
+  font-size: 13px;
+}
+.ctable td.c-definition .desc {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 0;
+  font-size: inherit;
+}
+.ctable .twisty {
   width: 18px;
   height: 18px;
+  margin-right: 4px;
   border: 0;
   background: none;
   padding: 0;
@@ -1309,27 +1381,37 @@ details.sparql pre {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  vertical-align: middle;
 }
-.ctree .twisty .icon {
+.ctable .twisty .icon {
   width: 13px;
   height: 13px;
+  transition: transform 0.12s;
 }
-.ctree .twisty.open .icon {
+.ctable .twisty.open .icon {
   transform: rotate(90deg);
 }
-.ctree .twisty.leaf {
+.ctable .twisty.leaf {
   visibility: hidden;
 }
-.ctree .notation {
-  font-family: var(--oe-mono);
-  font-size: 11.5px;
-  color: var(--oe-text-3);
-  margin-left: 6px;
-}
-.ctree .count {
+.ctable .count {
   color: var(--oe-text-3);
   font-size: 11.5px;
   margin-left: 4px;
+}
+.ctable tr.ctx td {
+  opacity: 0.55;
+}
+.ctable tr.ctx td.c-label {
+  font-weight: 400;
+}
+.ctable tr.more-row td {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+.ctable-status {
+  margin: 0 0 8px;
+  font-size: 12.5px;
 }
 .about-foot {
   margin-top: 40px;
